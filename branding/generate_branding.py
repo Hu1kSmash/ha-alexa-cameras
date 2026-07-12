@@ -249,7 +249,7 @@ def make_social(font_path=None):
     centered(int(452 * S), tag, tf, (168, 188, 212, 255))
 
     # feature pills
-    pills = ["Home Assistant", "MPEG-TS HLS", "Echo Show", "Self-hosted"]
+    pills = ["Home Assistant", "MPEG-TS HLS", "Echo Show", "Self-hosted", "TTS audio"]
     pf = load_font(28 * S, 640, font_path)
     ph, gp, padx = int(58 * S), int(22 * S), int(30 * S)
     ws = [width_of(p, pf) + padx * 2 for p in pills]
