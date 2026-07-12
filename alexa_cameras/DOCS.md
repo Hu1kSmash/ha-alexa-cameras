@@ -99,7 +99,7 @@ full `url`.
 | **Host** (`host`) | One of host/url | The camera's own address on your local network — its **IP address** (e.g. `192.168.1.64`) or hostname. This is the *camera itself*, not Home Assistant. The add-on combines it with the Username, Password, Port, and Path above to build the full RTSP link it pulls video from. Find a camera's IP in your router's device list or the camera's app. Give a camera **either** a Host **or** a full URL — not both. |
 | **URL** (`url`) | One of host/url | The **complete** RTSP link to a camera's stream, all in one field — e.g. `rtsp://admin:pass@192.168.1.64:554/stream`. Use this instead of **Host** when a camera doesn't fit the shared Username/Password/Port/Path pattern above, or for a non-standard source like a Frigate **birdseye** feed (`rtsp://ccab4aaf-frigate:8554/birdseye`). Whatever you enter is used **exactly as typed** and overrides all the RTSP defaults. If you fill this in, leave **Host** blank. |
 | **Path** (`path`) | No | Overrides the **Default RTSP path** for this **one** camera only. Use it when most of your cameras share a path but one is different — for example, a camera that only exposes its high-res **main** stream (`/cam/realmonitor?channel=1&subtype=0`). Leave it blank to use the Default RTSP path above. Ignored when the camera uses a full **URL**. |
-| **Mode** (`mode`) | **Yes** | How the add-on hands this camera's video to Alexa:<br>• **`copy`** — pass the video through untouched. Almost no CPU. Works when the camera already sends a format Alexa can play (H.264 Baseline/Main).<br>• **`transcode`** — re-encode the video into a format Alexa accepts (H.264 Baseline, 720p). Uses real CPU (~0.3–0.5 of a core per camera). Needed when the source is H.265/HEVC or H.264 High.<br>Rule of thumb: try **`copy`** first; if the Echo shows a **black screen** but the snapshot works, switch to **`transcode`**. Full explanation in the **`copy` vs `transcode`** section next. |
+| **Mode** (`mode`) | **Yes** | How the add-on prepares this camera's video for Alexa — the single most important per-camera choice, since it decides whether the add-on uses ~0% CPU or a real chunk of a core:<br>• **`copy`** — the source is *already* H.264 (Baseline/Main), so ffmpeg only **remuxes** it into MPEG-TS. Near-zero CPU. **Use this whenever you can.**<br>• **`transcode`** — the source is **H.265/HEVC**, H.264 **High** profile, or otherwise not Alexa-decodable, so ffmpeg **re-encodes** it (scales to 1280×720, H.264 Baseline). ~0.3–0.5 of a core per camera — use only where `copy` won't work.<br>**Rule of thumb:** try **`copy`** first; if the Echo shows a **black screen** but the snapshot works, the source needs **`transcode`**.<br>**Tip (Amcrest/Dahua & most NVRs):** set the camera's **sub / second stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `copy`. Reserve `transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**). |
 | **Audio** (`audio_source`) | No | Optional. Lets an Alexa announcement play **through this camera's sound** instead of interrupting the live view. Leave it blank for normal behaviour (the camera's own audio, if it has any).<br>• **`inject`** — replace the camera's audio with the announcement (good for silent cameras like Frigate birdseye).<br>• **`inject_mix`** — keep the camera's own audio and mix the announcement on top (needs a camera that actually has audio).<br>Only relevant if you use the **Audio injection** feature (below). |
 
 ### Audio injection
@@ -112,23 +112,6 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 | **Control API token** (`inject_token`) | No (recommended) | A password **you make up** to protect the audio-announcement API (the `POST :8790/say` endpoint that plays sound through a camera). Anything on your network that can reach that endpoint could otherwise play audio through your cameras, so set a long random string here and send the **same** value on every call (HTTP header `X-Inject-Token`, JSON field `token`, or `?token=` in the URL) — a wrong or missing value gets a **403**. This is unrelated to your camera or Home Assistant passwords; you invent it. Leave it blank only for a quick local test. |
 | **Default TTS engine** (`tts_engine`) | No | Which **text-to-speech voice** Home Assistant uses when you send a `{"text": "…"}` announcement and let the add-on speak it. It's the entity ID of a TTS engine you've set up in Home Assistant under **Settings → Voice assistants** — for example `tts.google_en_com`. The Configuration form gives you a **dropdown** of the engines you already have installed, so you don't have to type or guess it. Only needed for the *text* mode of audio injection (not when you play a ready-made audio URL). |
 | `ha_base` *(advanced, YAML only)* | No | Advanced, rarely changed — there's no form field for it. The web address the add-on uses to fetch audio that Home Assistant generates for `{"text": …}` announcements. Defaults to `http://homeassistant:8123` (Home Assistant's internal hostname), which works for almost every install. Only set this if your Home Assistant isn't reachable at that address. |
-
----
-
-## `copy` vs `transcode`
-
-The most important per-camera choice — it decides whether the add-on uses ~0% CPU or a
-real chunk of a core.
-
-- **`copy`** — the source is *already* H.264 (Baseline or Main). ffmpeg only **remuxes**
-  it into MPEG-TS. Near-zero CPU. **Use this whenever you can.**
-- **`transcode`** — the source is **H.265/HEVC**, H.264 **High** profile, or otherwise
-  not Alexa-decodable. ffmpeg **re-encodes** it: scales to 1280×720, H.264 Baseline.
-  ~0.3–0.5 of a core per camera, so only where `copy` won't work.
-
-**Tip (Amcrest/Dahua and most NVRs):** in the camera's web UI set its **sub / second
-stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `mode: copy`. Reserve
-`transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**).
 
 ---
 
