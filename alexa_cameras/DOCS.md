@@ -28,7 +28,7 @@ Each camera you configure is served on the add-on's port **8888** at:
 
 ---
 
-## Where the configuration lives
+## Configuration overview
 
 **You configure this add-on in its own Web UI, not in the Home Assistant *Configuration*
 (Options) tab.** Open the add-on and click **Open Web UI**, or use the **Alexa Cameras**
