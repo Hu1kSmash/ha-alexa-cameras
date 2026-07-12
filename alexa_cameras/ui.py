@@ -660,7 +660,8 @@ INDEX_HTML = r"""<!doctype html>
   .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
   @media (max-width:640px){ .cfg-grid { grid-template-columns:1fr; } }
   .cfg-grid label { display:flex; flex-direction:column; gap:4px; font-size:.85rem; opacity:.9; }
-  .cfg-grid input { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; }
+  .cfg-grid input, .cfg-grid select { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; }
+  .cfg-grid select option { background:Canvas; color:CanvasText; }
   label.single { display:flex; flex-direction:column; gap:6px; font-size:.85rem; opacity:.9; }
   label.single input { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; width:100%; }
   .iprow { display:flex; align-items:center; gap:8px; margin-top:6px; }
@@ -818,7 +819,7 @@ INDEX_HTML = r"""<!doctype html>
           <label>Control API token<span class="pwwrap"><input id="f-inject-token" type="password" placeholder="a long random secret (protects :8790)"><button type="button" id="itbtn" class="pwtoggle" onclick="toggleInjectToken()">Show</button></span></label>
           <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
         </div>
-        <p class="sub" style="margin:6px 0 0">The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
+        <p class="sub" style="margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line)"><b>Note:</b> The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.4
+
+- **Config form polish:** the **Default TTS engine** dropdown now uses the same styling as
+  the rest of the form (it was rendering with the raw browser default). The control-port
+  note under **Audio injection** is now visually separated and prefixed **Note:** so it no
+  longer reads as if it's describing the Control API token field above it.
+
 ## 1.9.3
 
 - **Config form tidy-up:** the **Audio injection** panel now sits *below* the **Cameras**
