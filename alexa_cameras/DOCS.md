@@ -28,7 +28,26 @@ Each camera you configure is served on the add-on's port **8888** at:
 
 ---
 
-## Configuration overview
+## The add-on Web UI
+
+Everything is done from the add-on's own dashboard — click **Open Web UI**, or use the **Alexa
+Cameras** item in the Home Assistant sidebar. Its tabs:
+
+- **Overview** — status, a clickable **Served at** `http://<HA-IP>:8888` link (browse the raw
+  served files), and a summary of your cameras.
+- **Configuration** — the form / YAML editor (covered in the next sections).
+- **Validate streams** — per-camera **Source** + **Output** checks (see [Validate streams](#validate-streams)).
+- **Public URL check** — per camera, compares the **Internal** LAN stream (`:8888`) with your
+  **External** HTTPS URL (what Amazon fetches). Both show clickable stream + snapshot links. A
+  **403** on external is *good* (reachable + WAF-locked to Amazon); a **200** means it's *not*
+  locked down.
+- **Logs** — live add-on output (also shown in the HA add-on log).
+
+![Overview tab](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/overview.png)
+
+---
+
+## Configuration Overview
 
 **You configure this add-on in its own Web UI, not in the Home Assistant *Configuration*
 (Options) tab.** Open the add-on and click **Open Web UI**, or use the **Alexa Cameras**
@@ -178,29 +197,23 @@ but it's straightforward to find:
   `rtsp://<user>:<password>@<camera-ip>:554<path>`. Paste it into **VLC** (*Media → Open Network
   Stream*), or run `ffprobe "rtsp://user:pass@192.168.1.201:554/your/path"`. If it plays / prints
   codec info, the path is correct — and `codec_name` tells you whether to use `copy` (`h264`) or
-  `transcode` (`hevc`).
+  `transcode` (`hevc`). Rather not fiddle with VLC/ffprobe? The add-on's own
+  **[Validate streams](#validate-streams)** tool runs this exact check for you — that's next.
 
 ---
 
-## The Web UI tabs
+## Validate streams
 
-- **Overview** — status, a clickable **Served at** `http://<HA-IP>:8888` link (browse
-  the raw served files), and a summary of your cameras.
-- **Configuration** — the form / YAML editor described above.
-- **Logs** — live add-on output (also shown in the HA add-on log). See below.
-- **Validate streams** — per camera: **Source** (ffprobes the RTSP feed and checks its
-  codec/profile against `mode`) and **Output** (confirms this add-on's `:8888` HLS is
-  live and decodable H.264 Baseline).
-- **Public URL check** — per camera, compares the **Internal** LAN stream (`:8888`) with
-  your **External** HTTPS URL (what Amazon fetches). Both show clickable stream +
-  snapshot links. A **403** on external is *good* (reachable + WAF-locked to Amazon); a
-  **200** means it's *not* locked down.
+The **Validate streams** tab runs the manual RTSP check above *for you*, and adds a second check
+on the add-on's own output. Per camera it reports:
 
-![Overview tab](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/overview.png)
+- **Source** — ffprobes the camera's RTSP feed and checks its codec/profile against the camera's
+  `mode` — e.g. it flags an H.265 / H.264-**High** source left on `copy`.
+- **Output** — confirms the add-on's `:8888` HLS is live and decodable H.264 Baseline (what Alexa
+  actually opens).
 
-**Validate streams** shows **Source** + **Output** per camera (green = good) and flags problems
-in plain English — here it flags a `transcode` camera whose source is *already* H.264 Baseline,
-so it could switch to `copy` and save CPU:
+Green means good; anything wrong is called out in plain English. Here it flags a `transcode`
+camera whose source is *already* H.264 Baseline, so it could switch to `copy` and save CPU:
 
 ![Validate streams — source already H.264 Baseline, could use copy](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-h246.png)
 
