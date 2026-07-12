@@ -200,6 +200,25 @@ cameras:
   snapshot links. A **403** on external is *good* (reachable + WAF-locked to Amazon); a
   **200** means it's *not* locked down.
 
+![Overview tab](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/overview.png)
+
+**Validate streams** shows **Source** + **Output** per camera (green = good) and flags problems
+in plain English — here it flags a `transcode` camera whose source is *already* H.264 Baseline,
+so it could switch to `copy` and save CPU:
+
+![Validate streams — source already H.264 Baseline, could use copy](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-h246.png)
+
+![Validate streams — healthy cameras](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
+
+An **on-demand** source like a **Frigate birdseye** feed validates differently: while it's idle
+(nothing actively pulling it), its restream can be cold, so **Source** may show a red timeout and
+**Output** an amber *"playlist isn't advancing"* warning. For an on-demand feed **that's expected,
+not a misconfiguration** — it wakes when something requests it, and Frigate's `idle_heartbeat_fps`
+keeps it warm (see the **birdseye** recipe below). On a normal always-on camera, red/amber here
+signals a real problem worth chasing.
+
+![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
+
 ---
 
 ## Logs — and telling whether Alexa is reaching the add-on
@@ -417,7 +436,7 @@ expose it to the internet, and protect it with `inject_token`.
   keyframe, which matters for on-demand sources (e.g. Frigate birdseye). Keeping such a
   stream warm — *and* running at real-time so it opens promptly on Alexa (too low and the
   idle stream time-dilates, adding seconds to *"show birdseye"*) — is the *source's* job:
-  set Frigate `birdseye.idle_heartbeat_fps: 10` (see the README's birdseye bonus for why).
+  set Frigate `birdseye.idle_heartbeat_fps: 10` (see the **birdseye** recipe below for why).
 - ffmpeg errors are surfaced into the Logs, each line prefixed with the camera name
   (`[frontporch] ...`), so you can tell *which* camera is failing and *why*.
 
@@ -453,3 +472,158 @@ expose it to the internet, and protect it with `inject_token`.
 - **Port 8888 is plain HTTP.** Alexa requires HTTPS with a valid cert, so put HTTPS in
   front of 8888 (Cloudflare Tunnel, nginx, Caddy…). See the setup guide.
 - **Camera names in Alexa** come from Home Assistant, not the `name` field here.
+
+---
+
+## Bonus: auto-pushing a camera (birdseye) to an Echo Show
+
+> **Out of scope for this add-on** — this needs the community **Alexa Media Player**
+> integration and your own Home Assistant automation. But it's a great trick, and a
+> frequent question, so here's the recipe.
+
+**First, make birdseye playable at all.** Frigate's birdseye restream is H.264
+**High** profile, and Alexa only plays H.264 **Baseline/Main** — so *"Alexa, show
+birdseye"* fails by default. Fix it exactly like an H.265 camera: serve birdseye
+*through this add-on* with a `url` override and `mode: transcode` (High → Baseline),
+then map it in your Lambda `CAMERA_MAP` and HA `entity_config` like any other camera:
+
+```yaml
+cameras:
+  - name: frontporch                               # a normal camera (already H.264)
+    host: 192.168.1.201                              # the camera's IP on your home network
+    mode: copy                                      # just remux, near-zero CPU
+  - name: birdseye                                  # the Frigate follow-cam
+    url: "rtsp://ccab4aaf-frigate:8554/birdseye"    # Frigate birdseye restream
+    mode: transcode                                 # High -> Baseline for Alexa
+```
+
+> **Note:** the snippet above is the **add-on's** camera config, *not* Frigate.
+>
+> **On the hostname:** `ccab4aaf-frigate` is the internal Docker hostname of the
+> *standard* Frigate add-on (the `ccab4aaf` slug comes from Frigate's add-on repo — it's
+> the same for everyone on that add-on, and it's not sensitive). If you run a different
+> Frigate variant (Beta, a proxy add-on, a custom repo), your slug — and thus the
+> hostname — differs; confirm yours if birdseye won't connect.
+
+On the **Frigate** side, enable and tune birdseye so the restream both *exists* and
+*stays alive* — birdseye is on-demand, and by default it stops emitting frames when
+idle, so the stream goes silent and consumers (go2rtc → this add-on → Alexa) eventually
+drop it:
+
+```yaml
+# Frigate config.yml
+birdseye:
+  enabled: true
+  restream: true  # exposes rtsp://<frigate>:8554/birdseye for the add-on to read
+  mode: objects  # "follow-cam": show whichever camera currently has activity
+  quality: 8  # 1 is max quality/bitrate (wasteful); 8 is plenty for an Echo Show
+  # idle_heartbeat_fps is the KEY setting, and it does two jobs:
+  #   1) keeps birdseye emitting when idle so the restream never goes silent
+  #      (default 0 = goes cold and drops out; too low, e.g. 1, starves keyframes
+  #      so consumers can't re-establish);
+  #   2) sets idle RESPONSIVENESS. Frigate's birdseye producer declares a 10fps feed
+  #      internally, so a lower value TIME-DILATES the idle stream (it runs slower than
+  #      real-time) -- which is why "Alexa, show birdseye" can take ~8-10s to open while
+  #      a normal camera is instant. Use 10 to match the producer so idle birdseye runs
+  #      at real-time and opens promptly.
+  idle_heartbeat_fps: 10
+  layout:
+    max_cameras: 1  # one camera, full-frame (a true single follow-cam)
+```
+
+`idle_heartbeat_fps` is the important one: it keeps birdseye's pipe warm 24/7 so the
+add-on's puller never loses it, **and** it keeps the idle stream running at real-time so
+Alexa opens it promptly — set it too low and the idle timeline crawls (slower than
+real-time), adding several seconds to *"show birdseye"* while a normal camera opens
+instantly. Without it, no amount of add-on-side reconnecting fully fixes the "birdseye
+goes down after a while" problem — the fix belongs at the source.
+
+That makes `camera.birdseye` a fully valid Alexa camera — it displays correctly on an
+Echo Show. **But saying *"Alexa, show camera birdseye"* usually fails:** Alexa
+transcribes *"birdseye"* as *"bird's eye"* (two words) and can't match a device named
+`Birdseye`, so the command falls through and times out. Two ways to get a trigger that
+actually works:
+
+- **A voice Routine (nice trick).** Make an Alexa Routine whose *trigger phrase* is what
+  Alexa actually hears — e.g. *"show birds eye"* — and whose *action* is a **Custom**
+  command that runs the exact device phrase *"show camera birdseye"*. You say the
+  natural phrase; the routine fires the exact command, bridging the transcription gap.
+  (This works because the action is a custom **utterance**, not the routine's built-in
+  "show camera" **device** action — that device action is the part that's unreliable
+  for HLS cameras.) Alternatively, just rename the Alexa device to something it
+  transcribes cleanly, like *"Overview"*.
+- **An automation (hands-free / auto-show).** The most reliable trigger of all — Home
+  Assistant sends the exact text command, skipping speech matching entirely. See below.
+
+**Then, push it to a screen automatically (the reliable path).** *"Alexa, show …"* is
+you asking. To make an Echo Show display a camera **on its own** — e.g. pop birdseye up
+the moment Frigate detects motion, or as a manual trigger that actually works — use
+the
+**[Alexa Media Player](https://github.com/alandtse/alexa_media_player)** integration's
+text-command feature. It sends a phrase to a specific Echo *as if you spoke it*:
+
+```yaml
+# inside a Home Assistant automation's actions:
+- service: media_player.play_media
+  target:
+    entity_id: media_player.kitchen            # your Echo Show
+  data:
+    media_content_type: custom
+    media_content_id: "show camera birdseye"   # exactly what you'd say out loud
+```
+
+Trigger that on a Frigate detection (e.g. `sensor.<cam>_all_active_count` above `0`,
+which counts only *moving* objects) and you get hands-free "pop the camera up when
+something moves." Because birdseye (`mode: objects`, `max_cameras: 1`) follows the
+active camera **inside one stream**, the Echo never reconnects as activity moves
+between cameras. Send `media_content_id: "stop"` the same way to dismiss it.
+
+Caveats: this rides Alexa Media Player's **unofficial** text-command API (issues →
+[that project](https://github.com/alandtse/alexa_media_player)); use the reliable
+**`show camera <name>`** phrasing, since Alexa intercepts the bare word *"doorbell."*
+
+---
+
+## Bonus tool: bulk-clean stale Alexa devices
+
+> **Not part of this add-on** — just a handy community tool you'll probably want once
+> you've added a pile of cameras and need to wipe Alexa's device list and start clean.
+
+Whenever you change which entities you expose to Alexa (or rename cameras), Alexa
+tends to keep the **old devices lingering** — and duplicate/stale names collide
+with voice commands and routines (e.g. *"Alexa, show front doorbell"* landing on
+the wrong camera). Amazon has no built-in "delete all devices" button.
+
+[**Shereef/Python-Delete-Alexa-Devices**](https://github.com/Shereef/Python-Delete-Alexa-Devices)
+documents a browser-console method to bulk-delete **all** your Alexa smart-home
+devices at once, after which you re-discover a clean set. Method write-up:
+[issue #9](https://github.com/Shereef/Python-Delete-Alexa-Devices/issues/9).
+
+> ⚠️ **Use at your own risk.** This deletes **every** smart-home device from your
+> Alexa account — not just cameras. Re-discovery rebuilds whatever you currently
+> expose, but any Alexa Groups/Routines referencing those devices may need to be
+> rebuilt. It uses an unofficial Amazon endpoint that can change without notice.
+
+**1. Find your region's JSON endpoint.** Sign in to Amazon, then open each of
+these in a tab until one returns JSON/text containing your device list (the
+others 404 or redirect):
+
+```
+https://alexa.amazon.com/api/behaviors/entities?skillId=amzn1.ask.1p.smarthome
+https://pitangui.amazon.com/api/behaviors/entities?skillId=amzn1.ask.1p.smarthome
+https://layla.amazon.com/api/behaviors/entities?skillId=amzn1.ask.1p.smarthome
+https://alexa.amazon.de/api/behaviors/entities?skillId=amzn1.ask.1p.smarthome
+https://alexa.amazon.co.jp/api/behaviors/entities?skillId=amzn1.ask.1p.smarthome
+```
+
+**2. On that same domain**, open DevTools → Console (F12). If pasting is blocked,
+type `allow pasting` first, then run (lists every endpoint via GraphQL, then
+DELETEs each):
+
+```javascript
+devices = await (await fetch('/nexus/v1/graphql', { method: 'POST', headers: {"Content-Type": "application/json","Accept": "application/json"}, body: JSON.stringify({query: `query { endpoints { items { friendlyName legacyAppliance { applianceId }}} } `})})).json();for (const device of devices.data.endpoints.items) console.log(await fetch(`/api/phoenix/appliance/${encodeURIComponent(device.legacyAppliance.applianceId)}`, { method: "DELETE", headers: { "Accept": "application/json", "Content-Type": "application/json"}}))
+```
+
+**3. Refresh the page**, then say **"Alexa, discover devices."**
+
+If the fetch returns `401`, issue #9 documents a fallback that adds a CSRF token header.
