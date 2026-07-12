@@ -264,32 +264,11 @@ flags a `transcode` camera whose source is already H.264 Baseline, so it could s
 
 ![Validate streams — source already Alexa-ready, could use copy](docs/images/validate-stream-h246.png)
 
-### Finding your camera's RTSP path (`default_path`)
+### Finding your camera's RTSP path
 
-Every camera brand serves its video at a slightly different RTSP "path" — the part
-after the IP address. Choosing the right one is **specific to your camera
-manufacturer** (outside this add-on's control), but it's straightforward to find:
-
-- Look up **your camera model's "RTSP URL"** in its manual, or in a community
-  database like **[iSpyConnect's camera list](https://www.ispyconnect.com/cameras)**
-  (searchable by brand/model).
-- Common starting points — always verify against **your** model/firmware:
-
-  | Brand | Typical **sub-stream** path | Typical **main-stream** path |
-  |---|---|---|
-  | Amcrest / Dahua | `/cam/realmonitor?channel=1&subtype=1` | `/cam/realmonitor?channel=1&subtype=0` |
-  | Hikvision | `/Streaming/Channels/102` | `/Streaming/Channels/101` |
-  | Reolink | `/h264Preview_01_sub` | `/h264Preview_01_main` |
-  | Other / ONVIF | check the manufacturer or iSpyConnect | — |
-
-- **Prefer the sub-stream** (lower resolution) for Alexa — it's plenty for a small
-  Echo Show screen and, if it's H.264, needs no transcoding.
-- **Test it before wiring up Alexa.** The full stream URL is
-  `rtsp://<user>:<password>@<camera-ip>:554<path>`. Paste it into **VLC**
-  (*Media → Open Network Stream*), or run
-  `ffprobe "rtsp://user:pass@192.168.1.201:554/your/path"`. If it plays / prints codec
-  info, the path is correct — and `codec_name` tells you whether to use `copy`
-  (`h264`) or `transcode` (`hevc`).
+Every camera brand uses a different RTSP path. Finding the right one — a per-brand
+starting-point table plus how to test it in VLC/ffprobe — lives in the add-on docs:
+**[Configuration → Finding your camera's RTSP path](alexa_cameras/DOCS.md#finding-your-cameras-rtsp-path)**.
 
 A single camera can also override the shared `default_path` with its own `path:` —
 see [`alexa_cameras/DOCS.md`](alexa_cameras/DOCS.md).

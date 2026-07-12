@@ -80,7 +80,7 @@ full `url` ignores these and uses whatever is in that URL.)
 | **Username** (`rtsp_user`) | No | The username you log in to your cameras with — the same account you'd type into the camera's app, its web page, or a viewer like VLC to see the video. IP cameras almost always require a login before they'll hand over their video stream. This one username is applied to every camera you add by IP/hostname; a camera set up with a full `url` uses whatever is in that URL instead. Many cameras ship with `admin` as the default — set this to the account you actually use. |
 | **Password** (`rtsp_password`) | No | The password that goes with the username above — the login for your camera's video stream. It gets inserted into the RTSP link, so any characters that have a special meaning in a URL must be **percent-encoded**: `@`→`%40`, `:`→`%3A`, `/`→`%2F`, `?`→`%3F`, `#`→`%23`, `%`→`%25` (a `$` is fine as-is). If the **Logs** show a repeating `401 Unauthorized`, the camera rejected the login — almost always a wrong password or a special character that wasn't encoded. |
 | **Port** (`rtsp_port`) | No | The network port your cameras use for RTSP. This is almost always **`554`** (the industry standard), so if you've never deliberately changed it, leave it at 554. Only change it if your camera or NVR documentation lists a different RTSP port. |
-| **Default RTSP path** (`default_path`) | No | The last part of the RTSP link — everything after the camera's IP and port — that tells the camera **which** video feed to send. Most cameras offer two: a high-resolution **main** stream and a lower-resolution **sub** stream, and the exact path text differs by brand. This value is used for every camera that doesn't set its own **Path**, so if all your cameras are the same brand you set it once here. The shipped default `/cam/realmonitor?channel=1&subtype=1` is the Amcrest/Dahua **sub-stream** — low-res, which is perfect for the small Echo Show screen and usually already H.264 (so `copy` works). Don't know yours? See *Finding your camera's RTSP path* in the [project README](https://github.com/Hu1kSmash/ha-alexa-cameras#finding-your-cameras-rtsp-path-default_path) — you can discover it with VLC or the camera's web page. |
+| **Default RTSP path** (`default_path`) | No | The last part of the RTSP link — everything after the camera's IP and port — that tells the camera **which** video feed to send. Most cameras offer two: a high-resolution **main** stream and a lower-resolution **sub** stream, and the exact path text differs by brand. This value is used for every camera that doesn't set its own **Path**, so if all your cameras are the same brand you set it once here. The shipped default `/cam/realmonitor?channel=1&subtype=1` is the Amcrest/Dahua **sub-stream** — low-res, which is perfect for the small Echo Show screen and usually already H.264 (so `copy` works). Don't know yours? See the **Finding your camera's RTSP path** section below — you can discover it with VLC or the camera's web page. |
 
 ### Home Assistant IP
 
@@ -129,6 +129,34 @@ real chunk of a core.
 **Tip (Amcrest/Dahua and most NVRs):** in the camera's web UI set its **sub / second
 stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `mode: copy`. Reserve
 `transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**).
+
+---
+
+## Finding your camera's RTSP path
+
+Every camera brand serves its video at a slightly different RTSP **path** — the part of the
+link after the IP address and port (the **Default RTSP path** / per-camera **Path** setting).
+Which one is right is **specific to your camera manufacturer** (outside this add-on's control),
+but it's straightforward to find:
+
+- Look up **your camera model's "RTSP URL"** in its manual, or in a community database like
+  **[iSpyConnect's camera list](https://www.ispyconnect.com/cameras)** (searchable by brand/model).
+- Common starting points — always verify against **your** model/firmware:
+
+  | Brand | Typical **sub-stream** path | Typical **main-stream** path |
+  |---|---|---|
+  | Amcrest / Dahua | `/cam/realmonitor?channel=1&subtype=1` | `/cam/realmonitor?channel=1&subtype=0` |
+  | Hikvision | `/Streaming/Channels/102` | `/Streaming/Channels/101` |
+  | Reolink | `/h264Preview_01_sub` | `/h264Preview_01_main` |
+  | Other / ONVIF | check the manufacturer or iSpyConnect | — |
+
+- **Prefer the sub-stream** (lower resolution) for Alexa — it's plenty for a small Echo Show
+  screen and, if it's H.264, needs no transcoding.
+- **Test it before wiring up Alexa.** The full stream URL is
+  `rtsp://<user>:<password>@<camera-ip>:554<path>`. Paste it into **VLC** (*Media → Open Network
+  Stream*), or run `ffprobe "rtsp://user:pass@192.168.1.201:554/your/path"`. If it plays / prints
+  codec info, the path is correct — and `codec_name` tells you whether to use `copy` (`h264`) or
+  `transcode` (`hevc`).
 
 ---
 
