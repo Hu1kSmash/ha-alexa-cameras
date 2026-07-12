@@ -6,7 +6,7 @@ edited from this UI (form or raw YAML) — NOT the Home Assistant add-on options
 so it needs no Supervisor API access. Saving writes the file and touches /tmp/reload,
 which run.sh watches to restart the camera workers in-place.
 
-Tabs: Overview, Configuration, Logs, Validate streams, Public URL check,
+Tabs: Overview, Configuration, Validate streams, Public URL check, Logs,
 + a hidden Advanced diagnostics page (deep stream probes; reached via the small
 icon on Overview) that uses the /api/validate/{rate|keyframe|firstframe} endpoints.
 
@@ -759,9 +759,9 @@ INDEX_HTML = r"""<!doctype html>
   <div class="tabs">
     <button class="tab active" data-tab="overview" onclick="showTab('overview')">Overview</button>
     <button class="tab" data-tab="config" onclick="showTab('config')">Configuration</button>
-    <button class="tab" data-tab="logs" onclick="showTab('logs')">Logs</button>
     <button class="tab" data-tab="validate" onclick="showTab('validate')">Validate streams</button>
     <button class="tab" data-tab="public" onclick="showTab('public')">Public URL check</button>
+    <button class="tab" data-tab="logs" onclick="showTab('logs')">Logs</button>
   </div>
 
   <section id="tab-overview">

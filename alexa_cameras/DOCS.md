@@ -35,13 +35,11 @@ Cameras** item in the Home Assistant sidebar. Its tabs:
 
 - **Overview** — status, a clickable **Served at** `http://<HA-IP>:8888` link (browse the raw
   served files), and a summary of your cameras.
-- **Configuration** — the form / YAML editor (covered in the next sections).
-- **Validate streams** — per-camera **Source** + **Output** checks (see [Validate streams](#validate-streams)).
-- **Public URL check** — per camera, compares the **Internal** LAN stream (`:8888`) with your
-  **External** HTTPS URL (what Amazon fetches). Both show clickable stream + snapshot links. A
-  **403** on external is *good* (reachable + WAF-locked to Amazon); a **200** means it's *not*
-  locked down.
-- **Logs** — live add-on output (also shown in the HA add-on log).
+- **[Configuration](#configuration-overview)** — the form / YAML editor (covered next).
+- **[Validate streams](#validate-streams)** — per-camera **Source** + **Output** codec checks.
+- **[Public URL check](#public-url-check)** — compares the **Internal** LAN stream (`:8888`) with
+  your **External** HTTPS URL; a **403** on the external side is the good result.
+- **[Logs](#logs)** — live add-on output, and the quickest black-Echo triage.
 
 ![Overview tab](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/overview.png)
 
@@ -230,7 +228,26 @@ signals a real problem worth chasing.
 
 ---
 
-## Logs — and telling whether Alexa is reaching the add-on
+## Public URL check
+
+Once your camera is reachable over the internet (via the tunnel + Alexa skill — see the
+[setup guide](https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/docs/END-TO-END-SETUP.md)),
+this tab confirms the whole chain per camera. It compares:
+
+- **Internal** — the LAN stream on `:8888` (built from your **Home Assistant IP**), what the
+  add-on serves directly on your network.
+- **External** — your public **HTTPS** URL, what Amazon's relay actually fetches.
+
+Both show clickable stream + snapshot links. On the **External** side a **403** is the *ideal*
+result: the URL is reachable **and** your Cloudflare WAF rule is locking it to Amazon's fetchers.
+A **200** warns that the stream is reachable but **not** locked down — anyone with the URL could
+watch it (see the setup guide's WAF step).
+
+![Public URL check — a green 403 per camera is the ideal result](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/public-url-check.png)
+
+---
+
+## Logs
 
 Every request to `:8888` is logged with the **client IP**. This is the quickest way to
 tell where a "black Echo Show" problem is:
@@ -256,10 +273,6 @@ The Logs tab — internal validation traffic from `127.0.0.1`:
 a `172.x` address (`172.30.32.1`, via the tunnel):
 
 ![The Logs tab — Amazon's relay reaching the add-on](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs-alexa.png)
-
-The **Public URL check** tab — a green **`403`** per camera is the ideal result:
-
-![Public URL check](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/public-url-check.png)
 
 ---
 
