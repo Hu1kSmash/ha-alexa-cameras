@@ -880,6 +880,21 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 // so force it to safe characters live: lowercase letters, numbers, underscore. This stops a
 // user pasting/typing a space or capital that would break the stream; the server validates too.
 function sanitizeName(el){ var s=el.value.toLowerCase().replace(/[^a-z0-9_]/g,''); if(s!==el.value) el.value=s; }
+// A camera uses EITHER host OR url, never both. Whichever the user fills in locks the other
+// (greyed + disabled) until they clear it; url wins if both somehow carry a value.
+function hostUrlExclusive(el){
+  var tr = el.closest ? el.closest('tr') : null; if(!tr) return;
+  var h = tr.querySelector('[data-f="host"]'), u = tr.querySelector('[data-f="url"]');
+  if(!h || !u) return;
+  var hv = h.value.trim()!=='', uv = u.value.trim()!=='';
+  if(uv){ h.disabled = true; u.disabled = false; }
+  else if(hv){ u.disabled = true; h.disabled = false; }
+  else { h.disabled = false; u.disabled = false; }
+  [h,u].forEach(function(x){
+    x.style.opacity = x.disabled ? '0.4' : '';
+    x.title = x.disabled ? 'A camera uses host OR url — clear the other field to edit this one.' : '';
+  });
+}
 function val(id){ return (document.getElementById(id).value||'').trim(); }
 function msg(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
 function isIPv4(v){ return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v) && v.split('.').every(function(o){ return +o<=255; }); }
@@ -949,6 +964,8 @@ function renderForm(){
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
   var head ='<tr><th>Name</th><th>Host</th><th>URL (override)</th><th>Path</th><th>Mode</th><th>Audio</th><th></th></tr>';
   document.getElementById('camrows').innerHTML = head + (CFG.cameras||[]).map(camRow).join('');
+  // Reflect host/url mutual exclusion on the freshly-rendered rows (loaded config).
+  document.querySelectorAll('#camrows tr [data-f="host"]').forEach(hostUrlExclusive);
 }
 function populateTtsEngines(){
   var sel = document.getElementById('f-tts-engine'); if(!sel) return;
@@ -973,8 +990,8 @@ function camRow(c,i){
     return '<option value="'+esc(o)+'"'+(av===o?' selected':'')+'>'+(o||'(none)')+'</option>'; }).join('')+'</select>';
   return '<tr>'+
     '<td><input value="'+esc(c.name)+'" data-f="name" oninput="sanitizeName(this)" placeholder="frontporch" title="URL segment: lowercase letters, numbers, and underscore only — no spaces or capitals"></td>'+
-    '<td><input value="'+esc(c.host)+'" data-f="host"></td>'+
-    '<td><input value="'+esc(c.url)+'" data-f="url"></td>'+
+    '<td><input value="'+esc(c.host)+'" data-f="host" oninput="hostUrlExclusive(this)" placeholder="192.168.1.64"></td>'+
+    '<td><input value="'+esc(c.url)+'" data-f="url" oninput="hostUrlExclusive(this)" placeholder="rtsp://…"></td>'+
     '<td><input value="'+esc(c.path)+'" data-f="path"></td>'+
     '<td><select data-f="mode"><option'+(c.mode==='copy'?' selected':'')+'>copy</option><option'+(c.mode!=='copy'?' selected':'')+'>transcode</option></select></td>'+
     '<td>'+asel+'</td>'+
