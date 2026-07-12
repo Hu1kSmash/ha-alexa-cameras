@@ -83,6 +83,7 @@ Each **camera** row:
 | `url` | one of host/url | A **full** RTSP URL that overrides host/path/credentials/port. Use for non-standard sources — e.g. a Frigate **birdseye** feed at `rtsp://ccab4aaf-frigate:8554/birdseye`. |
 | `path` | no | Per-camera RTSP path, overriding `default_path`. |
 | `mode` | **yes** | `copy` or `transcode` (see below). |
+| `audio_source` | no | Leave unset for the camera's normal audio. Set to `inject` or `inject_mix` to announce *through* this camera — see the **Audio injection** section below. |
 
 > **Password characters.** `rtsp_password` is inserted into the RTSP URL, so any
 > URL-reserved characters must be **percent-encoded**: `@` → `%40`, `:` → `%3A`,
@@ -233,6 +234,10 @@ Send it audio to play through a camera. Include the token (header `X-Inject-Toke
 {"cam": "birdseye", "test": true}                          // built-in test beep
 ```
 
+There's also a health check: **`GET http://<addon-host>:8790/health`** returns
+`{"ok": true, "cams": ["birdseye", …]}` — a quick way to confirm the injector is running and
+see exactly which cameras are inject-enabled (no token required).
+
 ### Auth (`inject_token`) and choosing a TTS
 
 **`inject_token` guards the control API.** The injector can make any `inject`-mode camera play
@@ -382,7 +387,7 @@ expose it to the internet, and protect it with `inject_token`.
 | Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
-| **Audio injection:** `POST /say` → **400 `no inject camera '<name>'`** | That camera's **Audio** is `none` (or the name is wrong) — nothing is injected, no stream is touched | Set the camera's **Audio** to `inject`/`inject_mix` and restart the add-on. The reply's `cams` list shows which cameras *are* inject-enabled; target one of those (or omit `cam` to use the first). |
+| **Audio injection:** `POST /say` → **400 `no inject camera '<name>'`** | That camera's **Audio** is `none` (or the name is wrong) — nothing is injected, no stream is touched | Set the camera's **Audio** to `inject`/`inject_mix` and **Save & apply** (no add-on restart needed — the injector re-reads its cameras on save). The reply's `cams` list shows which cameras *are* inject-enabled; target one of those (or omit `cam` to use the first). |
 | **Audio injection:** `{text}` → **401 Unauthorized** | Add-on can't reach HA's TTS | Update to **≥ 1.9.0** (grants `homeassistant_api`) and set a valid `tts_engine`. |
 | **Audio injection:** `/say` → **500 "No such file"** | The audio URL isn't reachable from the add-on's container | Prefer `{text}` (the add-on fetches internally). With `{url}`, point at something the container can reach — not an HA *external* LAN-IP URL. |
 

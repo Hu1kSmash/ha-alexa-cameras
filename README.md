@@ -136,6 +136,14 @@ RTSP camera ──► ffmpeg (per camera) ──► /tmp/hls/<name>/*.ts + strea
 - **Robustness:** each camera runs in a restart loop with **exponential backoff**
   (3s → 60s) so a wrong password can't hammer a camera into an auth-lockout;
   ffmpeg's stderr is surfaced (per-camera prefixed) into the add-on **Log**.
+- **Stall watchdog:** the other failure mode is an ffmpeg that keeps *running* but
+  stops producing (a frozen mux). If a camera's playlist stops advancing (~60s), only
+  **that camera's** worker is restarted (up to 3×, then a one-time warning) — never the
+  whole add-on, never the other cameras.
+- **Announce through a camera (optional):** a small injector on **:8790** can splice a
+  TTS/audio clip into a camera's audio track (`audio_source: inject` / `inject_mix`), so
+  an Alexa announcement plays *over* the live view instead of tearing it down. See
+  [`alexa_cameras/DOCS.md`](alexa_cameras/DOCS.md).
 - **Latency:** 1-second segments. Amazon's relay does **not** support LL-HLS, so
   ~3 seconds glass-to-glass is the practical floor.
 

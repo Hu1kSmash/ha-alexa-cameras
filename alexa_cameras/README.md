@@ -21,6 +21,9 @@ instead.
   — H.265 / H.264-High source: re-encode to H.264 Baseline 720p.
 - **Self-healing** — each camera is its own ffmpeg process with exponential backoff, so
   one bad camera can't take down the others and a wrong password won't hammer it.
+- **Announce _through_ a camera (experimental)** — mix a spoken TTS announcement into a
+  camera's audio track so an Alexa alert plays *over* the live view instead of tearing it
+  down. See [DOCS.md](DOCS.md).
 - **Built-in Web UI** — edit config, validate each stream's codec, and check the public
   URL, all from the add-on's own dashboard (not the Home Assistant *Options* tab).
 
@@ -38,8 +41,8 @@ of port 8888 and a self-hosted Alexa Smart Home skill — that full build is the
 
 ## Documentation
 
-- **[DOCS.md](DOCS.md)** — full configuration reference, `copy` vs `transcode`, the
-  Web UI tabs, and troubleshooting.
+- **[DOCS.md](DOCS.md)** — full configuration reference, `copy` vs `transcode`, audio
+  injection (announce through a camera), the Web UI tabs, and troubleshooting.
 - **[Repository README](../README.md)** — *why* Alexa needs exactly this stream format,
   why go2rtc's HLS goes black, and how this add-on fixes it.
 - **[End-to-End Setup](../docs/END-TO-END-SETUP.md)** — the complete self-hosted path:
