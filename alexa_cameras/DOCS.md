@@ -117,9 +117,11 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 
 ## Example configuration
 
-A complete config, showing how the fields above fit together — three cameras (a plain
-`copy` camera, one with a per-camera `path` on `transcode`, and a `url`-override birdseye).
-The **View as YAML** toggle in the Configuration tab shows yours in exactly this form.
+A complete config with **every** field, showing how they fit together — RTSP defaults, the
+optional audio-injection keys, and three cameras: a plain `copy` camera, a `transcode` camera
+with a per-camera `path` that mixes announcements into its own audio, and a `url`-override
+birdseye whose (silent) audio is replaced with announcements. The **View as YAML** toggle in the
+Configuration tab shows yours in exactly this form.
 
 ```yaml
 lan_ip: 192.168.1.100                                # Home Assistant server's LAN IP (required)
@@ -130,6 +132,11 @@ rtsp_password: "your-password"                       # percent-encode reserved c
 rtsp_port: 554
 default_path: "/cam/realmonitor?channel=1&subtype=1" # Amcrest/Dahua SUB stream
 
+# Audio injection (optional) — announce THROUGH a camera; see "Audio injection" below
+inject_token: "a-long-random-secret"                 # protects the :8790 control API
+tts_engine: "tts.google_en_com"                      # default HA voice for {"text": ...}
+# ha_base: "http://homeassistant:8123"               # advanced; the default is fine
+
 cameras:
   - name: frontporch                                 # -> /frontporch/stream.m3u8
     host: 192.168.1.201                              # this camera's IP
@@ -138,9 +145,11 @@ cameras:
     host: 192.168.1.206
     path: "/cam/realmonitor?channel=1&subtype=0"     # this one only has a main stream
     mode: transcode
+    audio_source: inject_mix                          # keep its audio + overlay announcements
   - name: birdseye                                    # Frigate follow-cam (H.264 High)
-    url: "rtsp://ccab4aaf-frigate:8554/birdseye"      # hostname = the standard Frigate
-    mode: transcode                                   # add-on; a different variant differs
+    url: "rtsp://ccab4aaf-frigate:8554/birdseye"      # hostname = the standard Frigate add-on
+    mode: transcode
+    audio_source: inject                              # birdseye is silent -> replace with TTS
 ```
 
 ---
