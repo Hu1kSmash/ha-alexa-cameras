@@ -37,8 +37,7 @@ item in the Home Assistant sidebar, then go to the **Configuration** tab.
 - Settings are stored in the add-on's own `/data/config.yaml` and applied **instantly**
   on save (the camera streams restart in place — no add-on restart needed).
 - The add-on has **no settings in the Home Assistant *Configuration* (Options) tab** —
-  that tab is intentionally empty; everything lives in the Web UI. (Very old versions
-  seeded `config.yaml` from it once on first run; it's no longer shown.)
+  that tab is intentionally empty; everything lives in the Web UI.
 
 The Configuration tab has a **form** with a **View as YAML** toggle — use whichever you
 prefer; they edit the same file.
