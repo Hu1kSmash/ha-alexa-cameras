@@ -96,11 +96,18 @@ Each **camera** row:
 The same settings again, one at a time, with the *why* — to head off the common questions.
 
 **Home Assistant IP (`lan_ip`).** The private LAN IPv4 of your HA server (e.g.
-`192.168.1.100`) — the four boxes in the form. It must be an **IP, not a hostname**: it's
-used only to build the clickable *Served at* (Overview) and *Internal* (Public URL check)
-links so they point at your real LAN address, and the form validates it as four numbers. It
-has **nothing to do with how Alexa reaches your cameras** — that path is the Cloudflare
-tunnel + Alexa skill/Lambda (see the setup guide), not this IP.
+`192.168.1.100`) — the four boxes in the form. It must be an **IP, not a hostname**, and
+it's **required** for a real reason: it's the exact address your **Cloudflare tunnel must
+point at**. The add-on publishes port **8888 on the HA host**, so the tunnel's route (or
+`additional_hosts` service) has to target `http://<this-IP>:8888` (see the setup guide).
+Entering it here forces you to commit to that one correct internal address and gives you the
+tools to verify it: the Overview **Served at** link shows the `http://<lan_ip>:8888` value —
+copy it straight into your tunnel config — and the **Public URL check** tab compares this
+*Internal* address against your *External* HTTPS URL, so if the internal stream serves but
+the external one doesn't, you know the break is in the tunnel/WAF, not the add-on. Point the
+tunnel anywhere else — the `homeassistant` hostname (that's HA Core on `:8123`) or Frigate's
+go2rtc (`:1984`) — and the camera won't serve: a black screen. **`lan_ip` and the tunnel
+target must be the same host.**
 
 **RTSP defaults (`rtsp_user` / `rtsp_password` / `rtsp_port`).** The login and port
 **shared** by every camera you enter as a `host`: the add-on builds each such camera's URL
