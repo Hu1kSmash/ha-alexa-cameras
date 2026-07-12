@@ -258,22 +258,70 @@ accident.
   The add-on plays whatever's there; it has no idea what produced it. Use this for anything that
   isn't an HA TTS entity. (The URL must be reachable from the add-on's container.)
 
-### Reference automation
+### Recommended: add three `rest_command`s (no curl needed)
 
-First add a **`rest_command`** that posts to the control API. In your Home Assistant
-**`configuration.yaml`** (add the `rest_command:` block if you don't already have one), then
-reload it from **Developer Tools → YAML → "REST commands"** (or restart HA):
+The control API only answers **POST**, so you can't fire it from a browser address bar. The
+easy way to POST — from automations *and* by hand — is a Home Assistant **`rest_command`**:
+Home Assistant does the POST for you, and each becomes a one-click action under **Developer
+Tools → Actions**. Add these three to your **`configuration.yaml`** (create the
+`rest_command:` block if you don't already have one), then reload from **Developer Tools →
+YAML → "REST commands"** (no HA restart needed once the block already exists):
 
 ```yaml
 rest_command:
+  # Speak text — the add-on renders TTS with your default engine and injects it.
   cam_say:
     url: "http://192.168.1.100:8790/say"    # your HA / add-on host's LAN IP + the control port
     method: POST
     content_type: "application/json"
     payload: '{"cam": "{{ cam }}", "text": "{{ message }}", "token": "a-long-random-secret"}'
+  # Test beep — proves the pipe end-to-end without any TTS.
+  cam_beep:
+    url: "http://192.168.1.100:8790/say"
+    method: POST
+    content_type: "application/json"
+    payload: '{"cam": "{{ cam }}", "test": true, "token": "a-long-random-secret"}'
+  # Play any audio URL the add-on's container can reach.
+  cam_url:
+    url: "http://192.168.1.100:8790/say"
+    method: POST
+    content_type: "application/json"
+    payload: '{"cam": "{{ cam }}", "url": "{{ url }}", "token": "a-long-random-secret"}'
 ```
 
-Now any automation can announce through a camera:
+Use the same `inject_token` value in all three payloads as in the add-on config (change it in
+both places if you rotate it, or keep it in `secrets.yaml` and reference `{{ … }}`).
+
+**Try them by hand** from **Developer Tools → Actions** while a camera is showing on an Echo:
+
+```yaml
+# test beep
+action: rest_command.cam_beep
+data:
+  cam: garagedoors
+```
+```yaml
+# speak text
+action: rest_command.cam_say
+data:
+  cam: garagedoors
+  message: "A vehicle is approaching the house"
+```
+```yaml
+# play an audio URL
+action: rest_command.cam_url
+data:
+  cam: garagedoors
+  url: "http://…/clip.mp3"
+```
+
+![Running rest_command.cam_say from Developer Tools → Actions (YAML mode); the Response panel shows the injector's reply — `ok: true`, the target `cam`, the clip length in `ms`, and `status: 200`](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/developer-tools-test-cam-say.png)
+
+A successful call returns `ok: true` with the injected clip's length in `ms`; if the camera's
+**Audio** isn't `inject`/`inject_mix` you'll get `400 no inject camera '<name>'` instead (nothing
+is played, no stream is touched).
+
+**In an automation**, wire your detection trigger to `cam_say`:
 
 ```yaml
 automation:
@@ -285,9 +333,6 @@ automation:
           cam: birdseye
           message: "A vehicle is approaching the house"
 ```
-
-> **Tip:** to try it by hand, call `rest_command.cam_say` from **Developer Tools → Actions**
-> with `cam` + `message` while a camera is showing on an Echo.
 
 **Notes / limits.** Audio only flows while the camera produces video, so on a source that
 goes idle (e.g. birdseye at rest) an injected clip plays once activity resumes — fine for
