@@ -224,8 +224,30 @@ Send it audio to play through a camera. Include the token (header `X-Inject-Toke
 {"cam": "birdseye", "test": true}                          // built-in test beep
 ```
 
-`text` is the easy path (the add-on calls HA's TTS with your engine and injects it). `url`
-is fully engine-agnostic — point it at *any* audio (a local-LLM TTS, a chime, a siren).
+### Auth (`inject_token`) and choosing a TTS
+
+**`inject_token` guards the control API.** The injector can make any `inject`-mode camera play
+*arbitrary* audio, so `/say` shouldn't be open on your LAN. Set `inject_token` to a long random
+string in the add-on config; then every request must carry the **same** value — header
+`X-Inject-Token: <token>`, JSON `"token": "<token>"`, or `?token=<token>` — or it gets **403
+Forbidden**. Leave it empty and `/say` accepts anything (fine for a quick test, but set one). It's
+a *static* secret: the same value goes in the add-on config **and** in whatever calls `/say` (so if
+you change it, change it in both places — e.g. the `rest_command` payload below). The port is
+LAN-only regardless; the token is the second layer so nothing on your network fires a camera by
+accident.
+
+**Using a different TTS** — two independent paths, and this is the point of the design:
+
+- **`{text}` mode** renders speech with a **Home Assistant TTS engine** — *any* TTS entity you have
+  works: Google Translate, local **Piper** (`tts.piper`), Home Assistant Cloud, ElevenLabs, a
+  local-LLM TTS integration, etc. Set the default with **`tts_engine`** in the add-on config, or
+  override per request with an `engine` field:
+  `{"cam":"birdseye","text":"…","engine":"tts.piper"}`. Switching voices is a one-line change — the
+  add-on just asks HA to render with that engine.
+- **`{url}` mode** is **completely TTS-agnostic** — you make the audio *however you like* (any
+  engine, a local LLM writing an MP3, a pre-recorded clip, a chime) and hand `/say` a URL to fetch.
+  The add-on plays whatever's there; it has no idea what produced it. Use this for anything that
+  isn't an HA TTS entity. (The URL must be reachable from the add-on's container.)
 
 ### Reference automation
 
