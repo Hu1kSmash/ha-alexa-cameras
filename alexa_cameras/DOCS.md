@@ -118,6 +118,7 @@ full `url`.
 | **Path** (`path`) | No | Overrides the **Default RTSP path** for this **one** camera only. Use it when most of your cameras share a path but one is different — for example, a camera that only exposes its high-res **main** stream (`/cam/realmonitor?channel=1&subtype=0`). Leave it blank to use the Default RTSP path above. Ignored when the camera uses a full **URL**. |
 | **Mode** (`mode`) | **Yes** | How the add-on prepares this camera's video for Alexa — the single most important per-camera choice, since it decides whether the add-on uses ~0% CPU or a real chunk of a core:<br>• **`copy`** — the source is *already* H.264 (Baseline/Main), so ffmpeg only **remuxes** it into MPEG-TS. Near-zero CPU. **Use this whenever you can.**<br>• **`transcode`** — the source is **H.265/HEVC**, H.264 **High** profile, or otherwise not Alexa-decodable, so ffmpeg **re-encodes** it (scales to 1280×720, H.264 Baseline). ~0.3–0.5 of a core per camera — use only where `copy` won't work.<br>**Rule of thumb:** try **`copy`** first; if the Echo shows a **black screen** but the snapshot works, the source needs **`transcode`**.<br>**Tip (Amcrest/Dahua & most NVRs):** set the camera's **sub / second stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `copy`. Reserve `transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**). |
 | **Audio** (`audio_source`) | No | Optional. Lets an Alexa announcement play **through this camera's sound** instead of interrupting the live view. Leave it blank for normal behaviour (the camera's own audio, if it has any).<br>• **`inject`** — replace the camera's audio with the announcement (good for silent cameras like Frigate birdseye).<br>• **`inject_mix`** — keep the camera's own audio and mix the announcement on top (needs a camera that actually has audio).<br>Only relevant if you use the **Audio injection** feature (below). |
+| **On-demand** (`on_demand`) | No | Tick this for a source that's **expected to be absent / `404` when nothing's using it** — most notably a Frigate **birdseye** (`mode: objects`) feed, which only exists while Frigate is tracking activity. When set, the add-on treats that camera's idle state as *normal* instead of an error: it **quiets the repeated `404` / connection errors** in the Logs (announcing the wait just once), **excludes the camera from the stall watchdog** (no restart-loop or "giving up" warning), retries on a **calm fixed interval**, and shows it as **Idle** (not red/amber) in Validate streams. Leave it off for normal always-on cameras, where those errors *are* real problems. See the **Frigate birdseye** notes under *Validate streams*. |
 
 ### Audio injection
 
@@ -167,6 +168,7 @@ cameras:
     url: "rtsp://ccab4aaf-frigate:8554/birdseye"      # hostname = the standard Frigate add-on
     mode: transcode
     audio_source: inject                              # birdseye is silent -> replace with TTS
+    on_demand: true                                   # idle/404 when Frigate isn't tracking -> quiet it
 ```
 
 ---
@@ -240,9 +242,14 @@ camera whose source is *already* H.264 Baseline, so it could switch to `copy` an
 > `idle_heartbeat_fps` can keep it warmer and quicker to open *when it's already up*, but it won't
 > keep a follow-cam alive when there's nothing to follow.
 >
+> **Quiet the noise:** tick the **On-demand** box for the birdseye camera (config key
+> `on_demand: true`). The add-on then treats its idle `404`s as normal — it collapses the repeated
+> errors into a single "waiting" line, skips the stall watchdog for it, and shows it as **Idle**
+> here instead of red/amber.
+>
 > Bottom line: for **birdseye specifically**, idle `404` / Source-timeout / watchdog-restart noise
-> is **safe to ignore**. On a *normal, always-on* camera, red/amber here is a real problem worth
-> chasing.
+> is **safe to ignore** (and, with **On-demand** ticked, mostly silenced). On a *normal, always-on*
+> camera, red/amber here is a real problem worth chasing.
 
 ![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
 

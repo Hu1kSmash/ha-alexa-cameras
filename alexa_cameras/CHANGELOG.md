@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.9.6
+
+- **New: per-camera `on_demand` flag (an *On-demand* checkbox in the Cameras table).** For a
+  source that's *expected* to be absent / `404` when nothing's using it — most notably a Frigate
+  **birdseye** (`mode: objects`) feed, which only exists while Frigate is tracking activity — the
+  add-on now treats that idle state as **normal** rather than an error. When ticked, that camera:
+  - **quiets the Logs** — the repeated `method DESCRIBE failed: 404` / `Error opening input` /
+    "stream exited; restarting" spam is filtered out and the wait is announced just **once**
+    (genuine, non-404 errors still pass through);
+  - is **excluded from the stall watchdog** (no restart loop, no "giving up" warning);
+  - retries on a **calm fixed interval** instead of hammering;
+  - validates as a neutral **Idle** (not red/amber) in **Validate streams**.
+- **Config-form polish:** the camera **Name** field now sanitizes as you type (lowercase /
+  numbers / underscore only — no spaces or capitals that would break the stream URL), and **Host**
+  and **URL** are now mutually exclusive per row (filling one greys out the other).
+- **Web UI tab order** now matches the docs: Overview · Configuration · Validate streams ·
+  Public URL check · **Logs** (Logs moved to last).
+- **Docs overhaul.** Every configuration field is now documented for a first-time user (what it is,
+  where to find it, why it matters); the reference is reorganised to mirror the config screen; a
+  worked **Example configuration** and a **Finding your camera's RTSP path** section live in the
+  add-on docs (the README is now a lean overview that points here); and there's an honest,
+  prominent write-up of **Frigate birdseye's** on-demand behaviour — it goes cold/`404` when idle,
+  and *viewing it (even "Alexa, show birdseye") won't start it* — only Frigate detecting activity
+  does. New **Public URL check** section and an anchor-linked Web UI tour.
+
 ## 1.9.5
 
 - **Fix: the Cameras table no longer forces a horizontal scrollbar.** The per-column width

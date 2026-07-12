@@ -73,6 +73,7 @@ for c in (o.get("cameras") or []):
         str(c.get("mode", "transcode")).strip(),
         str(c.get("url", "")).strip(),
         str(c.get("audio_source", "")).strip(),
+        "1" if str(c.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on") else "",
     ]))
 PY
 )
@@ -81,7 +82,7 @@ PY
 # copy  = camera stream is already H.264 -> remux only (near-zero CPU)
 # transcode = source is H.265/other -> scale to 720p H.264 Baseline for Alexa
 hls_loop() {
-  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}"
+  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}" on_demand="${7:-}"
   local src
   mkdir -p "$HLS/$cam"
   if [ -n "$url" ]; then
@@ -146,7 +147,13 @@ hls_loop() {
   # failed logins. Backoff resets to 3s only after a healthy (>=30s) run.
   # No input read-timeout on purpose — ffmpeg waits patiently for the first
   # keyframe, which matters for on-demand sources (e.g. Frigate birdseye).
-  local delay=3 start ran
+  # An `on_demand` source (Frigate birdseye etc.) is EXPECTED to be absent/404 when idle.
+  # For those: filter the predictable "source down" noise out of the log, announce the wait
+  # just once, and retry on a calm fixed interval instead of spamming an error every ~30s.
+  local NOISE='method DESCRIBE failed|Error opening input|Server returned 404|404 Not Found|Connection refused|Connection timed out|Immediate exit requested'
+  local delay=3 start ran waiting=0
+  local -a filt=(cat)
+  [ "$on_demand" = "1" ] && filt=(grep -vE "$NOISE")
   while true; do
     start=$(date +%s)
     ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
@@ -156,8 +163,23 @@ hls_loop() {
       -hls_flags "delete_segments+omit_endlist+independent_segments" \
       -hls_segment_type mpegts -hls_allow_cache 0 \
       -hls_segment_filename "$HLS/$cam/seg_%05d.ts" "$HLS/$cam/stream.m3u8" \
-      2>&1 | sed "s/^/[$cam] /"
+      2>&1 | "${filt[@]}" | sed "s/^/[$cam] /"
     ran=$(( $(date +%s) - start ))
+    if [ "$on_demand" = "1" ]; then
+      if [ "$ran" -ge 30 ]; then
+        waiting=0
+        echo "[$(date +%H:%M:%S)] $cam (on-demand) stream ended after ${ran}s; waiting for it to resume"
+        delay=5
+      elif [ "$waiting" = "0" ]; then
+        echo "[$(date +%H:%M:%S)] $cam (on-demand) source idle / not producing — waiting quietly (errors suppressed until it returns)"
+        waiting=1
+        delay=15
+      else
+        delay=15
+      fi
+      sleep "$delay"
+      continue
+    fi
     if [ "$ran" -ge 30 ]; then
       delay=3
     else
@@ -180,16 +202,16 @@ snap_loop() {
 
 start_workers() {
   read_config
-  local count=0 line name host path mode url
+  local count=0 line name host path mode url audio_source on_demand
   for line in "${CAMLINES[@]}"; do
     [ -z "$line" ] && continue
-    IFS='|' read -r name host path mode url audio_source <<< "$line"
+    IFS='|' read -r name host path mode url audio_source on_demand <<< "$line"
     [ -z "$name" ] && continue
     if [ "$audio_source" = "inject" ] || [ "$audio_source" = "inject_mix" ]; then
       mkdir -p /tmp/inject && mkfifo -m 600 "/tmp/inject/$name.pcm" 2>/dev/null
     fi
-    echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
-    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" & WPIDS+=($!)
+    echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source}${on_demand:+, on-demand})"
+    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" & WPIDS+=($!)
     snap_loop "$name" & WPIDS+=($!)
     count=$((count + 1))
   done
@@ -215,12 +237,18 @@ STALL_SECS=60
 STALL_MAX_RESTARTS=3
 watchdog_loop() {
   local -A seen chg fails warned
-  local now cam m d
+  local now cam m d ondemand
   while true; do
     now=$(date +%s)
+    # on-demand cameras are EXPECTED to stop producing when idle — never watchdog-restart them.
+    ondemand=" $(python3 -c 'import yaml
+try: cams=(yaml.safe_load(open("/data/config.yaml")) or {}).get("cameras",[]) or []
+except Exception: cams=[]
+print(" ".join(str(c.get("name","")).strip() for c in cams if str(c.get("on_demand","")).strip().lower() in ("true","1","yes","on")))' 2>/dev/null) "
     for d in "$HLS"/*/; do
       [ -e "$d/stream.m3u8" ] || continue
       cam=$(basename "$d")
+      case "$ondemand" in *" $cam "*) continue ;; esac
       m=$(stat -c %Y "$d/stream.m3u8" 2>/dev/null) || continue
       if [ "${seen[$cam]:-x}" != "$m" ]; then
         # advancing = healthy; clear the stall counters

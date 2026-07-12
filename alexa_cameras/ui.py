@@ -230,11 +230,19 @@ def classify(stream):
     return False, label
 
 
+def is_on_demand(cam):
+    return str(cam.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on")
+
+
 def check_source(cam, cfg):
     src = camera_source(cam, cfg)
     mode = str(cam.get("mode", "transcode"))
     stream, err = ffprobe_streams(src, rtsp=src.startswith("rtsp"), timeout=18)
     if err:
+        if is_on_demand(cam):
+            return {"status": "idle", "detail": "idle",
+                    "msg": "On-demand source isn't producing right now — expected when idle "
+                           "(e.g. Frigate birdseye). It validates once it's active."}
         return {"status": "error", "detail": mask(src),
                 "msg": f"Could not read the source: {err}."}
     copy_ok, label = classify(stream)
@@ -267,6 +275,10 @@ def check_output(cam):
         _, body1 = _get_playlist(playlist)
     except urllib.error.HTTPError as e:
         if e.code == 404:
+            if is_on_demand(cam):
+                return {"status": "idle", "detail": "idle",
+                        "msg": "No output yet — the on-demand source is idle (expected). "
+                               "It'll serve once the source is active."}
             return {"status": "error", "detail": "404",
                     "msg": "No stream yet — ffmpeg hasn't produced a playlist. "
                            "Check the Logs tab for this camera."}
@@ -294,6 +306,10 @@ def check_output(cam):
                 "msg": f"Serving, but a segment didn't probe cleanly: {err}."}
     copy_ok, label = classify(stream)
     if not advancing:
+        if is_on_demand(cam):
+            return {"status": "idle", "detail": "idle",
+                    "msg": "Playlist isn't advancing — the on-demand source has gone idle "
+                           "(expected). It resumes when the source is active again."}
         return {"status": "warn", "detail": label,
                 "msg": "Serving, but the playlist is not advancing — ffmpeg may be "
                        "restarting. Check the Logs tab."}
@@ -684,6 +700,7 @@ INDEX_HTML = r"""<!doctype html>
   .ok { background:rgba(34,197,94,.18); color:#16a34a; }
   .warn { background:rgba(234,179,8,.20); color:#b45309; }
   .error { background:rgba(239,68,68,.18); color:#dc2626; }
+  .idle { background:rgba(59,130,246,.16); color:#2563eb; }
   .pending { opacity:.6; }
   .detail { font-family:ui-monospace,monospace; font-size:.8rem; opacity:.85; }
   .pline { margin-bottom:12px; }
@@ -705,14 +722,15 @@ INDEX_HTML = r"""<!doctype html>
   .pwtoggle { border:1px solid var(--line); background:transparent; color:inherit; border-radius:8px; padding:0 12px; cursor:pointer; font-size:.82rem; }
   .pwtoggle:hover { background:var(--dim); }
   /* cameras table proportions + interactions */
-  #camrows { table-layout:fixed; width:100%; min-width:680px; }
-  #camrows th:nth-child(1),#camrows td:nth-child(1){ width:15%; }
-  #camrows th:nth-child(2),#camrows td:nth-child(2){ width:15%; }
-  #camrows th:nth-child(3),#camrows td:nth-child(3){ width:22%; }
-  #camrows th:nth-child(4),#camrows td:nth-child(4){ width:18%; }
-  #camrows th:nth-child(5),#camrows td:nth-child(5){ width:11%; }
-  #camrows th:nth-child(6),#camrows td:nth-child(6){ width:15%; }
-  #camrows th:nth-child(7),#camrows td:nth-child(7){ width:4%; text-align:right; padding-right:0; }
+  #camrows { table-layout:fixed; width:100%; min-width:760px; }
+  #camrows th:nth-child(1),#camrows td:nth-child(1){ width:14%; }
+  #camrows th:nth-child(2),#camrows td:nth-child(2){ width:13%; }
+  #camrows th:nth-child(3),#camrows td:nth-child(3){ width:20%; }
+  #camrows th:nth-child(4),#camrows td:nth-child(4){ width:16%; }
+  #camrows th:nth-child(5),#camrows td:nth-child(5){ width:10%; }
+  #camrows th:nth-child(6),#camrows td:nth-child(6){ width:13%; }
+  #camrows th:nth-child(7),#camrows td:nth-child(7){ width:10%; text-align:center; }
+  #camrows th:nth-child(8),#camrows td:nth-child(8){ width:4%; text-align:right; padding-right:0; }
   table.cams tr:hover td { background:rgba(59,130,246,.06); }
   .card { transition:border-color .12s, background .12s; }
   .card:hover { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.045); }
@@ -812,7 +830,7 @@ INDEX_HTML = r"""<!doctype html>
       <div class="panel"><h2>Cameras</h2>
         <div style="overflow-x:auto"><table class="cams" id="camrows"></table></div>
         <div style="margin-top:10px"><button class="btn-add" onclick="addCamRow()">+ Add camera</button></div>
-        <p class="sub" style="margin-top:10px">Each camera needs a <b>name</b> (lowercase, no spaces) and either a <b>host</b> or a full <b>url</b>. <b>mode</b>: <code>copy</code> if the source is already H.264 Baseline/Main, else <code>transcode</code>.</p>
+        <p class="sub" style="margin-top:10px">Each camera needs a <b>name</b> (lowercase, no spaces) and either a <b>host</b> or a full <b>url</b>. <b>mode</b>: <code>copy</code> if the source is already H.264 Baseline/Main, else <code>transcode</code>. Tick <b>On-demand</b> for a source that's expected to be idle/absent when inactive (e.g. Frigate <b>birdseye</b>) &mdash; it quiets that camera's logs, skips the stall watchdog, and validates as <i>Idle</i> rather than an error.</p>
       </div>
       <div class="panel"><h2>Audio injection (optional)</h2>
         <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in the table above) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
@@ -962,7 +980,7 @@ function renderForm(){
   var _oc=(CFG.lan_ip||'').split('.');
   document.getElementById('f-ip1').value=_oc[0]||''; document.getElementById('f-ip2').value=_oc[1]||'';
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
-  var head ='<tr><th>Name</th><th>Host</th><th>URL (override)</th><th>Path</th><th>Mode</th><th>Audio</th><th></th></tr>';
+  var head ='<tr><th>Name</th><th>Host</th><th>URL (override)</th><th>Path</th><th>Mode</th><th>Audio</th><th>On-demand</th><th></th></tr>';
   document.getElementById('camrows').innerHTML = head + (CFG.cameras||[]).map(camRow).join('');
   // Reflect host/url mutual exclusion on the freshly-rendered rows (loaded config).
   document.querySelectorAll('#camrows tr [data-f="host"]').forEach(hostUrlExclusive);
@@ -995,6 +1013,7 @@ function camRow(c,i){
     '<td><input value="'+esc(c.path)+'" data-f="path"></td>'+
     '<td><select data-f="mode"><option'+(c.mode==='copy'?' selected':'')+'>copy</option><option'+(c.mode!=='copy'?' selected':'')+'>transcode</option></select></td>'+
     '<td>'+asel+'</td>'+
+    '<td style="text-align:center"><input type="checkbox" data-f="on_demand"'+(c.on_demand?' checked':'')+' title="On-demand source (e.g. Frigate birdseye): expected to be idle / 404 when inactive — quiets its logs, skips the stall watchdog, and validates as Idle instead of an error"></td>'+
     '<td><button class="btn-del" onclick="delCamRow('+i+')" title="remove camera">&#10005;</button></td></tr>';
 }
 function gatherForm(){
@@ -1015,7 +1034,9 @@ function gatherForm(){
     var base = (CFG.cameras && CFG.cameras[idx]) || {}; idx++;
     var c = {}; for(var k in base){ if(base.hasOwnProperty(k)) c[k]=base[k]; }
     inputs.forEach(function(el){
-      var f=el.getAttribute('data-f'), v=(el.value||'').trim();
+      var f=el.getAttribute('data-f');
+      if(el.type==='checkbox'){ if(el.checked) c[f]=true; else delete c[f]; return; }
+      var v=(el.value||'').trim();
       if(v){ c[f]=v; } else { delete c[f]; }
     });
     if(c.name){ if(!c.mode) c.mode='transcode'; cams.push(c); }
