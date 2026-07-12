@@ -67,8 +67,6 @@ prefer; they edit the same file.
 
 ## Configuration reference
 
-The form (and the underlying `config.yaml`) has these settings:
-
 | Setting | Required | Description |
 |---|---|---|
 | **Home Assistant IP** (`lan_ip`) | **yes** | Your HA server's internal **private IPv4** address (e.g. `192.168.1.100`). **Must be an IP, not a hostname.** Used to build the *Served at* (Overview) and *Internal* (Public URL check) links so they point at the real LAN address. |
