@@ -67,8 +67,6 @@ prefer; they edit the same file.
 
 ## Configuration reference
 
-Every field, in the order the panels appear on the **Configuration** screen — top to bottom.
-
 ### RTSP defaults
 
 Shared login used to build the RTSP URL for any camera you enter by **hostname or IP
