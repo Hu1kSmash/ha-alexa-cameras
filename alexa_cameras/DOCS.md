@@ -219,21 +219,30 @@ camera whose source is *already* H.264 Baseline, so it could switch to `copy` an
 
 > ⚠️ **Heads-up about Frigate birdseye — expect idle errors, and they're harmless.**
 >
-> Birdseye is an **on-demand** stream. When nothing is actively watching it (and there's no
-> activity for it to follow), Frigate lets it go **cold and stop emitting frames**. While it's
-> idle you *will* see the **birdseye** camera throw warnings and errors — a red **Source** timeout
-> and an amber **Output** *"playlist isn't advancing"* here in Validate streams, and lines like
-> `[cam] Connection ...` / `[watchdog] birdseye … restarting` in the **Logs**.
+> Birdseye (`mode: objects`) is a **follow-cam with nothing to follow when idle.** When Frigate
+> isn't tracking any activity, its birdseye restream goes **fully cold — the RTSP endpoint returns
+> `404 Not Found`.** So the add-on's worker logs a burst of `method DESCRIBE failed: 404` /
+> `Error opening input file rtsp://…/birdseye`, retries every few seconds, and
+> `/<birdseye>/stream.m3u8` 404s too — which also shows as a red **Source** / amber **Output** here
+> in Validate streams.
 >
-> **This is normal and expected — it's simply how Frigate's birdseye restream behaves, not a fault
-> in this add-on or in your configuration, and there is nothing the add-on can do to change it**
-> (the behaviour is at the source). It does **not** break anything: the instant you say *"Alexa,
-> show birdseye"* — or Frigate detects activity — it wakes up and streams normally. Setting
-> Frigate's `idle_heartbeat_fps: 10` (see the **birdseye** recipe below) keeps it warmer and quicker
-> to open and quiets *most* of the noise, but you may still see the occasional idle hiccup.
+> **Important — this is the part people get wrong:** while birdseye is cold, **trying to view it
+> does *not* start it.** *"Alexa, show birdseye"* (or opening the stream in a browser / Validate)
+> just fails until **Frigate itself brings birdseye up — which only happens when it detects
+> activity and starts tracking.** The stream isn't being produced yet; there is nothing the add-on
+> can do to conjure it.
 >
-> So: for **birdseye specifically**, idle Source/Output/watchdog errors are **safe to ignore**. On
-> a *normal, always-on* camera, red/amber here is a real problem worth chasing.
+> **This is normal and expected — it's how Frigate's birdseye works, not a fault in this add-on or
+> your configuration.** And it doesn't break your setup: birdseye displays correctly whenever
+> there *is* activity — which is exactly when you'd want it up. So the **reliable** way to use it is
+> the **auto-show-on-detection** automation — push birdseye to the Echo *when Frigate detects
+> motion* (see the **birdseye** recipe below) — rather than an on-demand *"show birdseye."* Frigate's
+> `idle_heartbeat_fps` can keep it warmer and quicker to open *when it's already up*, but it won't
+> keep a follow-cam alive when there's nothing to follow.
+>
+> Bottom line: for **birdseye specifically**, idle `404` / Source-timeout / watchdog-restart noise
+> is **safe to ignore**. On a *normal, always-on* camera, red/amber here is a real problem worth
+> chasing.
 
 ![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
 
@@ -487,7 +496,7 @@ expose it to the internet, and protect it with `inject_token`.
 | Alexa black, **no `172.x`** in Logs when asked | Stream not reaching the add-on | Look upstream: Cloudflare / WAF / tunnel / Lambda (see the setup guide). |
 | Camera on Alexa **frozen** after an add-on restart/update | Alexa holds the last frame when the HLS stream restarts | Re-show it (*"Alexa, show &lt;camera&gt;"*). Any add-on restart interrupts a live view. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
-| **Frigate birdseye** logs errors/warnings when idle (Source timeout, Output "not advancing", watchdog restarts) | **Normal.** Birdseye is on-demand and goes cold when nothing's watching it — this is how Frigate's birdseye works, nothing the add-on can change | **Safe to ignore for birdseye.** It streams fine the moment it's shown / activity occurs. `idle_heartbeat_fps: 10` quiets most of it (see the birdseye recipe). |
+| **Frigate birdseye** logs `404` / errors when idle (`DESCRIBE failed: 404`, Source timeout, Output "not advancing", watchdog restarts) | **Normal.** With `mode: objects`, birdseye's restream goes cold (RTSP `404`) when Frigate isn't tracking anything — this is how birdseye works, nothing the add-on can change | **Safe to ignore for birdseye.** It comes up **only** when Frigate detects activity — *viewing a cold birdseye (even "Alexa, show birdseye") won't start it.* Use the auto-show-on-detection automation (see the birdseye recipe). |
 | Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
@@ -565,12 +574,17 @@ birdseye:
     max_cameras: 1  # one camera, full-frame (a true single follow-cam)
 ```
 
-`idle_heartbeat_fps` is the important one: it keeps birdseye's pipe warm 24/7 so the
-add-on's puller never loses it, **and** it keeps the idle stream running at real-time so
-Alexa opens it promptly — set it too low and the idle timeline crawls (slower than
-real-time), adding several seconds to *"show birdseye"* while a normal camera opens
-instantly. Without it, no amount of add-on-side reconnecting fully fixes the "birdseye
-goes down after a while" problem — the fix belongs at the source.
+`idle_heartbeat_fps` matters for two reasons: it keeps birdseye emitting **while it's up** (so the
+add-on's puller doesn't lose a live stream mid-idle), **and** it keeps that stream running at
+real-time so Alexa opens it promptly — set it too low and the idle timeline crawls (slower than
+real-time), adding several seconds to *"show birdseye"* while a normal camera opens instantly.
+
+> **It does not make birdseye available 24/7, though.** With `mode: objects` birdseye is a
+> follow-cam: when Frigate is tracking *nothing*, the restream still goes cold and returns `404`,
+> and **no viewer request will revive it — only Frigate detecting activity will** (see the birdseye
+> idle-errors note under *Validate streams* above). That's exactly why the **automation** below —
+> which shows birdseye *when Frigate detects motion* — is the reliable trigger, not an on-demand
+> *"show birdseye."*
 
 That makes `camera.birdseye` a fully valid Alexa camera — it displays correctly on an
 Echo Show. **But saying *"Alexa, show camera birdseye"* usually fails:** Alexa
