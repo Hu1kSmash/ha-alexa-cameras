@@ -876,6 +876,10 @@ INDEX_HTML = r"""<!doctype html>
 <script>
 var CAMS = null, CFG = {cameras:[]}, LANIP = '', yamlMode = false, cfgLoaded = false, logsTimer = null;
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+// Camera name becomes the URL path segment (/<name>/stream.m3u8) plus HLS dir + FIFO name,
+// so force it to safe characters live: lowercase letters, numbers, underscore. This stops a
+// user pasting/typing a space or capital that would break the stream; the server validates too.
+function sanitizeName(el){ var s=el.value.toLowerCase().replace(/[^a-z0-9_]/g,''); if(s!==el.value) el.value=s; }
 function val(id){ return (document.getElementById(id).value||'').trim(); }
 function msg(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
 function isIPv4(v){ return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v) && v.split('.').every(function(o){ return +o<=255; }); }
@@ -968,7 +972,7 @@ function camRow(c,i){
   var asel = '<select data-f="audio_source">'+opts.map(function(o){
     return '<option value="'+esc(o)+'"'+(av===o?' selected':'')+'>'+(o||'(none)')+'</option>'; }).join('')+'</select>';
   return '<tr>'+
-    '<td><input value="'+esc(c.name)+'" data-f="name"></td>'+
+    '<td><input value="'+esc(c.name)+'" data-f="name" oninput="sanitizeName(this)" placeholder="frontporch" title="URL segment: lowercase letters, numbers, and underscore only — no spaces or capitals"></td>'+
     '<td><input value="'+esc(c.host)+'" data-f="host"></td>'+
     '<td><input value="'+esc(c.url)+'" data-f="url"></td>'+
     '<td><input value="'+esc(c.path)+'" data-f="path"></td>'+

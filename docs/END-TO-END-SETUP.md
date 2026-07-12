@@ -287,9 +287,15 @@ http = urllib3.PoolManager(
     timeout=urllib3.Timeout(connect=2.0, read=10.0),
 )
 
-# Map the Alexa camera endpointId suffix -> the add-on camera name (the path
-# segment served at https://<your-domain>/<name>/stream.m3u8). For most setups the
-# HA entity id suffix and the add-on name are identical, e.g. 'frontporch'.
+# Map each camera's Home Assistant entity -> its add-on stream name.
+#   KEY   = the HA entity's object_id, i.e. the part after "camera." (Alexa sends it as
+#           the endpointId "camera#<object_id>"). So camera.front_porch -> key "front_porch".
+#   VALUE = the add-on camera `name` -- the URL segment served at
+#           https://<your-domain>/<name>/stream.m3u8. The add-on enforces this to lowercase
+#           letters/numbers/underscore (no spaces/capitals), the same character set HA uses
+#           for entity object_ids.
+# Easiest: name the add-on camera exactly like the HA entity's object_id, so key == value.
+# (What Alexa *speaks* is the entity's friendly name -- set separately via entity_config below.)
 CAMERA_MAP = {
     "frontporch": "frontporch",
     "frontdriveway": "frontdriveway",
