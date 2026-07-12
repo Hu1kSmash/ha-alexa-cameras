@@ -56,7 +56,11 @@ prefer; they edit the same file.
 4. Add a **camera**: a `name` (lowercase, no spaces), a **host** (its IP) *or* a full
    **url**, and a **mode** (`copy` if the source is already H.264 Baseline/Main, else
    `transcode`).
-5. **Save & apply.** Then use the **Validate streams** tab to confirm each camera, and
+5. *(Optional)* To announce **through** a camera instead of a separate Alexa announcement
+   that tears the view down, set that camera's **Audio** to `inject` or `inject_mix` and
+   fill in the **Audio injection** panel (a control-API token and default TTS engine). See
+   the **Audio injection** section below.
+6. **Save & apply.** Then use the **Validate streams** tab to confirm each camera, and
    the **Logs** tab if something's wrong.
 
 ---
