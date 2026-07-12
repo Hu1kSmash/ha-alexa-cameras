@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.3
+
+- **Config form tidy-up:** the **Audio injection** panel now sits *below* the **Cameras**
+  table (you pick a camera's Audio mode first, then configure injection), and the
+  **Control API token** field is masked with a **Show/Hide** toggle like the RTSP password.
+- **Docs:** documented the graceful "audio is `none`" case — calling `POST /say` for a
+  camera whose **Audio** isn't `inject`/`inject_mix` returns a clear
+  `400 no inject camera '<name>'` (with a `cams` list of what *is* enabled) and touches no
+  stream, rather than failing silently.
+
 ## 1.9.2
 
 - **The "Default TTS engine" field is now a dropdown** of your installed Home Assistant TTS

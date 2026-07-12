@@ -807,18 +807,18 @@ INDEX_HTML = r"""<!doctype html>
           <input id="f-ip4" class="octet" inputmode="numeric" maxlength="3" placeholder="100" oninput="octetInput(this,'')">
         </div>
       </div>
-      <div class="panel"><h2>Audio injection (optional)</h2>
-        <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in the table below) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
-        <div class="cfg-grid">
-          <label>Control API token<input id="f-inject-token" type="text" placeholder="a long random secret (protects :8790)"></label>
-          <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
-        </div>
-        <p class="sub" style="margin:6px 0 0">The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
-      </div>
       <div class="panel"><h2>Cameras</h2>
         <div style="overflow-x:auto"><table class="cams" id="camrows"></table></div>
         <div style="margin-top:10px"><button class="btn-add" onclick="addCamRow()">+ Add camera</button></div>
         <p class="sub" style="margin-top:10px">Each camera needs a <b>name</b> (lowercase, no spaces) and either a <b>host</b> or a full <b>url</b>. <b>mode</b>: <code>copy</code> if the source is already H.264 Baseline/Main, else <code>transcode</code>.</p>
+      </div>
+      <div class="panel"><h2>Audio injection (optional)</h2>
+        <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in the table above) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
+        <div class="cfg-grid">
+          <label>Control API token<span class="pwwrap"><input id="f-inject-token" type="password" placeholder="a long random secret (protects :8790)"><button type="button" id="itbtn" class="pwtoggle" onclick="toggleInjectToken()">Show</button></span></label>
+          <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
+        </div>
+        <p class="sub" style="margin:6px 0 0">The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>
@@ -912,6 +912,10 @@ async function loadCameras(){
 /* ---------- Configuration ---------- */
 function togglePw(){
   var i=document.getElementById('f-pass'), b=document.getElementById('pwbtn');
+  if(i.type==='password'){ i.type='text'; b.textContent='Hide'; } else { i.type='password'; b.textContent='Show'; }
+}
+function toggleInjectToken(){
+  var i=document.getElementById('f-inject-token'), b=document.getElementById('itbtn');
   if(i.type==='password'){ i.type='text'; b.textContent='Hide'; } else { i.type='password'; b.textContent='Show'; }
 }
 function discardChanges(){
