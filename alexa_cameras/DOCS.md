@@ -91,6 +91,64 @@ Each **camera** row:
 > `/` → `%2F`, `?` → `%3F`, `#` → `%23`, `%` → `%25`. (A `$` is fine as-is.) A
 > `401`/auth loop in the Logs usually means a mis-encoded password.
 
+### Settings in depth
+
+The same settings again, one at a time, with the *why* — to head off the common questions.
+
+**Home Assistant IP (`lan_ip`).** The private LAN IPv4 of your HA server (e.g.
+`192.168.1.100`) — the four boxes in the form. It must be an **IP, not a hostname**: it's
+used only to build the clickable *Served at* (Overview) and *Internal* (Public URL check)
+links so they point at your real LAN address, and the form validates it as four numbers. It
+has **nothing to do with how Alexa reaches your cameras** — that path is the Cloudflare
+tunnel + Alexa skill/Lambda (see the setup guide), not this IP.
+
+**RTSP defaults (`rtsp_user` / `rtsp_password` / `rtsp_port`).** The login and port
+**shared** by every camera you enter as a `host`: the add-on builds each such camera's URL
+as `rtsp://<user>:<pass>@<host>:<port><path>`. A camera entered as a full **`url`** ignores
+all three — put its credentials in the URL itself. See the *Password characters* note above
+for percent-encoding reserved characters.
+
+**Default RTSP path (`default_path`).** The stream path used by any `host` camera that
+doesn't set its own `path`. The shipped default is the Amcrest/Dahua **sub-stream**
+(`/cam/realmonitor?channel=1&subtype=1`) — a low-res second stream that's ideal for the
+small Echo Show screen and usually already H.264 (so `copy` works). Not sure of yours? See
+*Finding your camera's RTSP path* in the
+[project README](https://github.com/Hu1kSmash/ha-alexa-cameras#finding-your-cameras-rtsp-path-default_path).
+
+**`name` — and how it relates to the name Alexa speaks.** This is only the **URL path
+segment**: the camera is served at `/<name>/stream.m3u8`, so it must be lowercase
+letters / numbers / underscore with **no spaces**. It is deliberately **not** the name Alexa
+says. Three separate identifiers are in play when you say *"Alexa, show Front Porch"*:
+
+- **What Alexa speaks / you say** — e.g. *Front Porch* — is the camera **entity's friendly
+  name in Home Assistant** (exposed via `alexa: smart_home`). Spaces and capitals are fine.
+- **The routing key** — e.g. `frontporch` — is the HA **entity_id** suffix, which becomes
+  the Alexa *endpointId*.
+- **This add-on's `name`** — e.g. `frontporch` — is the URL segment above.
+
+The last two are bridged by the **`CAMERA_MAP`** in your Alexa Lambda (endpointId suffix →
+add-on name; see the setup guide). They're conventionally kept identical, which is why
+it's easy to assume they're one thing — but a mismatch (the add-on serves `/front_porch/`
+while the entity/endpointId is `frontporch`, with no map entry to bridge them) is a classic
+**black screen**: Alexa resolves the spoken name fine, then fetches a URL that 404s. So:
+pick a nice **friendly name in Home Assistant** for what Alexa says, and keep this `name`
+matched to your Lambda map.
+
+**`host` vs `url`.** Give a camera **either** a `host` (its IP/hostname — the add-on builds
+the RTSP URL from the shared defaults + `path`) **or** a full `url` (a complete `rtsp://…`
+that overrides credentials, port, and path entirely). Use `url` for anything non-standard —
+most notably a Frigate **birdseye** feed (`rtsp://ccab4aaf-frigate:8554/birdseye`).
+
+**`path`.** A per-camera RTSP path that overrides `default_path` — for the one camera whose
+stream lives somewhere different (e.g. it only has a main stream,
+`/cam/realmonitor?channel=1&subtype=0`). Ignored when the camera uses a full `url`.
+
+**`mode`.** `copy` vs `transcode` — the single most important per-camera choice. It has its
+own section next: **`copy` vs `transcode`**.
+
+**`audio_source`.** Optional *announce-through-the-camera* audio (`inject` / `inject_mix`).
+Covered fully in the **Audio injection** section below.
+
 ---
 
 ## `copy` vs `transcode`
