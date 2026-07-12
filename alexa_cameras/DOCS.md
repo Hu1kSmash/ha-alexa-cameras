@@ -217,12 +217,23 @@ camera whose source is *already* H.264 Baseline, so it could switch to `copy` an
 
 ![Validate streams — healthy cameras](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
 
-An **on-demand** source like a **Frigate birdseye** feed validates differently: while it's idle
-(nothing actively pulling it), its restream can be cold, so **Source** may show a red timeout and
-**Output** an amber *"playlist isn't advancing"* warning. For an on-demand feed **that's expected,
-not a misconfiguration** — it wakes when something requests it, and Frigate's `idle_heartbeat_fps`
-keeps it warm (see the **birdseye** recipe below). On a normal always-on camera, red/amber here
-signals a real problem worth chasing.
+> ⚠️ **Heads-up about Frigate birdseye — expect idle errors, and they're harmless.**
+>
+> Birdseye is an **on-demand** stream. When nothing is actively watching it (and there's no
+> activity for it to follow), Frigate lets it go **cold and stop emitting frames**. While it's
+> idle you *will* see the **birdseye** camera throw warnings and errors — a red **Source** timeout
+> and an amber **Output** *"playlist isn't advancing"* here in Validate streams, and lines like
+> `[cam] Connection ...` / `[watchdog] birdseye … restarting` in the **Logs**.
+>
+> **This is normal and expected — it's simply how Frigate's birdseye restream behaves, not a fault
+> in this add-on or in your configuration, and there is nothing the add-on can do to change it**
+> (the behaviour is at the source). It does **not** break anything: the instant you say *"Alexa,
+> show birdseye"* — or Frigate detects activity — it wakes up and streams normally. Setting
+> Frigate's `idle_heartbeat_fps: 10` (see the **birdseye** recipe below) keeps it warmer and quicker
+> to open and quiets *most* of the noise, but you may still see the occasional idle hiccup.
+>
+> So: for **birdseye specifically**, idle Source/Output/watchdog errors are **safe to ignore**. On
+> a *normal, always-on* camera, red/amber here is a real problem worth chasing.
 
 ![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
 
@@ -476,6 +487,7 @@ expose it to the internet, and protect it with `inject_token`.
 | Alexa black, **no `172.x`** in Logs when asked | Stream not reaching the add-on | Look upstream: Cloudflare / WAF / tunnel / Lambda (see the setup guide). |
 | Camera on Alexa **frozen** after an add-on restart/update | Alexa holds the last frame when the HLS stream restarts | Re-show it (*"Alexa, show &lt;camera&gt;"*). Any add-on restart interrupts a live view. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
+| **Frigate birdseye** logs errors/warnings when idle (Source timeout, Output "not advancing", watchdog restarts) | **Normal.** Birdseye is on-demand and goes cold when nothing's watching it — this is how Frigate's birdseye works, nothing the add-on can change | **Safe to ignore for birdseye.** It streams fine the moment it's shown / activity occurs. `idle_heartbeat_fps: 10` quiets most of it (see the birdseye recipe). |
 | Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
