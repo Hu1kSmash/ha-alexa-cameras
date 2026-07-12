@@ -8,13 +8,13 @@ Serve any RTSP camera to **Amazon Echo Show / Alexa** as a stream Alexa will
 actually play — H.264 Baseline, MPEG-TS HLS, read **directly from the camera**
 (no go2rtc in the media path, no Nabu Casa). It can also **mix spoken announcements
 into a camera's audio track**, so an alert plays *through* the live camera view on the
-Echo instead of the usual Alexa announcement that tears the view down (see the add-on's
-**Documentation** tab for setup).
+Echo instead of the usual Alexa announcement that tears the view down (see the
+**[Documentation](alexa_cameras/DOCS.md)** for setup).
 
 > **This add-on is one piece of a larger, fully self-hosted solution.** For the
 > complete build — the Alexa Smart Home skill, the AWS Lambda camera override,
 > and the Cloudflare Tunnel — follow **[docs/END-TO-END-SETUP.md](docs/END-TO-END-SETUP.md)**.
-> That guide is step-by-step and self-contained.
+> That **[guide](docs/END-TO-END-SETUP.md)** is step-by-step and self-contained.
 
 ## Contents
 
