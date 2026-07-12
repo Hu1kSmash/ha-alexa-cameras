@@ -69,9 +69,8 @@ prefer; they edit the same file.
 
 ### RTSP defaults
 
-Shared login used to build the RTSP URL for any camera you enter by **hostname or IP
-address**. A camera that uses a full `url` ignores all of these (put its credentials in the
-URL itself).
+Shared login used to build the RTSP URL for any camera you enter by `hostname or IP address`.
+A camera that uses a full `url` ignores all of these (put its credentials in the URL itself).
 
 | Field | Required | Description |
 |---|---|---|
