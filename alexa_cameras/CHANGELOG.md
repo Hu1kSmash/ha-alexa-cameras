@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.5
+
+- **Fix: the Cameras table no longer forces a horizontal scrollbar.** The per-column width
+  rules still only covered 6 columns after the **Audio** column was added, so the widths
+  landed on the wrong columns and, with a large fixed min-width, the table overflowed even
+  on a wide screen. Rewrote the widths for all 7 columns (summing to 100%) and lowered the
+  min-width, so the table now scales to fill the panel and only scrolls on very narrow
+  (mobile) widths.
+
 ## 1.9.4
 
 - **Config form polish:** the **Default TTS engine** dropdown now uses the same styling as

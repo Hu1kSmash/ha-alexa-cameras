@@ -705,13 +705,14 @@ INDEX_HTML = r"""<!doctype html>
   .pwtoggle { border:1px solid var(--line); background:transparent; color:inherit; border-radius:8px; padding:0 12px; cursor:pointer; font-size:.82rem; }
   .pwtoggle:hover { background:var(--dim); }
   /* cameras table proportions + interactions */
-  #camrows { table-layout:fixed; min-width:760px; }
-  #camrows th:nth-child(1),#camrows td:nth-child(1){ width:16%; }
-  #camrows th:nth-child(2),#camrows td:nth-child(2){ width:16%; }
-  #camrows th:nth-child(3),#camrows td:nth-child(3){ width:30%; }
-  #camrows th:nth-child(4),#camrows td:nth-child(4){ width:22%; }
-  #camrows th:nth-child(5),#camrows td:nth-child(5){ width:12%; }
-  #camrows th:nth-child(6),#camrows td:nth-child(6){ width:4%; text-align:right; padding-right:0; }
+  #camrows { table-layout:fixed; width:100%; min-width:680px; }
+  #camrows th:nth-child(1),#camrows td:nth-child(1){ width:15%; }
+  #camrows th:nth-child(2),#camrows td:nth-child(2){ width:15%; }
+  #camrows th:nth-child(3),#camrows td:nth-child(3){ width:22%; }
+  #camrows th:nth-child(4),#camrows td:nth-child(4){ width:18%; }
+  #camrows th:nth-child(5),#camrows td:nth-child(5){ width:11%; }
+  #camrows th:nth-child(6),#camrows td:nth-child(6){ width:15%; }
+  #camrows th:nth-child(7),#camrows td:nth-child(7){ width:4%; text-align:right; padding-right:0; }
   table.cams tr:hover td { background:rgba(59,130,246,.06); }
   .card { transition:border-color .12s, background .12s; }
   .card:hover { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.045); }
