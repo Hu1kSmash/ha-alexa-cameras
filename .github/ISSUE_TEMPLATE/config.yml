@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & setup help
+    url: https://github.com/Hu1kSmash/ha-alexa-cameras/discussions
+    about: For "how do I…" and setup questions, please use Discussions.
+  - name: End-to-End Setup guide
+    url: https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/docs/END-TO-END-SETUP.md
+    about: The full Cloudflare Tunnel + WAF + Alexa skill + Lambda walkthrough.

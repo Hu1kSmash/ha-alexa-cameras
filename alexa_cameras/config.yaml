@@ -1,0 +1,29 @@
+name: Alexa Cameras (HLS)
+version: "1.9.1"
+slug: alexa_cameras
+description: Serve RTSP cameras to Amazon Echo Show / Alexa as compatible H.264 MPEG-TS HLS.
+url: https://github.com/Hu1kSmash/ha-alexa-cameras/tree/main/alexa_cameras
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+  - i386
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:cast
+panel_title: Alexa Cameras
+# homeassistant_api lets the audio injector's {"text":...} mode call HA's tts_get_url
+# (via the Supervisor) to render an announcement with the user's own TTS engine.
+homeassistant_api: true
+ports:
+  "8888/tcp": 8888
+  "8790/tcp": 8790
+ports_description:
+  "8888/tcp": HLS playlist + snapshot HTTP endpoint (point your reverse proxy / tunnel here)
+  "8790/tcp": Audio injection control API (POST /say) — LAN only; protect with inject_token in config
+# No add-on Options schema: configuration is self-managed in the add-on's Web UI
+# (/data/config.yaml), so the Home Assistant "Configuration" (Options) tab is empty.
