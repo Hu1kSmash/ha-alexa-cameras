@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.9.2
+
+- **The "Default TTS engine" field is now a dropdown** of your installed Home Assistant TTS
+  engines (fetched live from HA via a new `/api/tts_engines`), instead of a free-text field you
+  had to guess. Falls back to your current value / manual entry if HA can't be reached.
+- **Docs:** clarified that `{text}` mode uses Home Assistant's built-in **Assist** TTS engines
+  (managed under **Settings → Voice assistants**), how to find an engine's entity ID, and that
+  audio can be enabled on any number of cameras; noted the small per-camera CPU cost of
+  `inject_mix` (it re-encodes the audio; the video is still copied).
+
 ## 1.9.1
 
 - **The config form now exposes the audio-injection settings** (no more hand-editing YAML):

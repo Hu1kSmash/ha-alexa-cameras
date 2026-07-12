@@ -194,7 +194,12 @@ form, or set it in YAML:
 | `inject` | **Replace** the audio with the announcement feed (silence between announcements) | silent sources (Frigate **birdseye**), or any camera whose own audio you don't want |
 | `inject_mix` | **Keep** the camera's own audio and **mix** announcements on top | cameras with useful audio (a doorbell, a mic'd cam). Requires the source to *have* audio |
 
-Both work with `copy` **or** `transcode`, on any camera.
+Both work with `copy` **or** `transcode`, on any camera — and you can enable audio on as
+many cameras as you like (each gets its own injection channel; `/say`'s `cam` field picks
+which one). **On CPU:** `inject`/`inject_mix` re-encode only the *audio* (the video is still
+copied in `copy` mode), so the overhead is small. But `inject_mix` on *every* camera does add
+a little per-camera work (decode the source audio + mix + re-encode), so it's not quite the
+near-zero of plain `copy` — negligible for a handful of cameras, worth knowing at scale.
 
 ```yaml
 cameras:
@@ -238,12 +243,16 @@ accident.
 
 **Using a different TTS** — two independent paths, and this is the point of the design:
 
-- **`{text}` mode** renders speech with a **Home Assistant TTS engine** — *any* TTS entity you have
-  works: Google Translate, local **Piper** (`tts.piper`), Home Assistant Cloud, ElevenLabs, a
-  local-LLM TTS integration, etc. Set the default with **`tts_engine`** in the add-on config, or
-  override per request with an `engine` field:
-  `{"cam":"birdseye","text":"…","engine":"tts.piper"}`. Switching voices is a one-line change — the
-  add-on just asks HA to render with that engine.
+- **`{text}` mode** renders speech with a **Home Assistant TTS engine** — the *same* engines
+  Home Assistant's built-in **Assist** uses. You manage/add them under **Settings → Voice
+  assistants** (`/config/voice-assistants/assistants`); install a TTS add-on/integration (Google
+  Translate, local **Piper**, Home Assistant Cloud, ElevenLabs, a local-LLM TTS, …) and it appears
+  there and as a `tts.*` entity. The `tts_engine` value is that **entity ID** — e.g.
+  `tts.google_en_com`. Find the exact ID under **Developer Tools → States** (filter `tts.`), or
+  just pick it from the dropdown in the add-on's config **form** (it lists your installed engines,
+  so there's nothing to guess). Set the default with `tts_engine`, or override per request with an
+  `engine` field: `{"cam":"birdseye","text":"…","engine":"tts.piper"}`. Switching voices is a
+  one-line change — the add-on just asks HA to render with that engine.
 - **`{url}` mode** is **completely TTS-agnostic** — you make the audio *however you like* (any
   engine, a local LLM writing an MP3, a pre-recorded clip, a chime) and hand `/say` a URL to fetch.
   The add-on plays whatever's there; it has no idea what produced it. Use this for anything that

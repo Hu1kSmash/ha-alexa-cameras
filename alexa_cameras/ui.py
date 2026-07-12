@@ -48,6 +48,30 @@ try:
 except Exception:
     VERSION = "unknown"
 
+# s6-overlay strips SUPERVISOR_TOKEN from the service env but persists it as a file.
+S6_TOKEN_FILE = "/run/s6/container_environment/SUPERVISOR_TOKEN"
+
+
+def tts_engines():
+    """List HA TTS engine entities (tts.*) so the config form can offer them as a dropdown
+    instead of a free-text guess. Uses the s6-persisted Supervisor token to reach HA's
+    states API (needs homeassistant_api in the manifest)."""
+    try:
+        tok = open(S6_TOKEN_FILE).read().strip()
+    except Exception:
+        tok = os.environ.get("SUPERVISOR_TOKEN", "")
+    try:
+        req = urllib.request.Request("http://supervisor/core/api/states",
+                                     headers={"Authorization": "Bearer " + tok})
+        states = json.load(urllib.request.urlopen(req, timeout=8))
+    except Exception as e:
+        return {"engines": [], "error": str(e)[:200]}
+    out = [{"id": s.get("entity_id", ""),
+            "name": (s.get("attributes") or {}).get("friendly_name") or s.get("entity_id", "")}
+           for s in states if str(s.get("entity_id", "")).startswith("tts.")]
+    out.sort(key=lambda x: x["id"])
+    return {"engines": out, "error": None}
+
 COPY_OK_PROFILES = {"Constrained Baseline", "Baseline", "Main"}
 
 
@@ -545,6 +569,8 @@ class Handler(BaseHTTPRequestHandler):
                 "data": cfg, "yaml": dump_yaml(cfg), "error": cfg_err}))
         if path == "api/logs":
             return self._send(200, json.dumps({"text": read_logs()}))
+        if path == "api/tts_engines":
+            return self._send(200, json.dumps(tts_engines()))
         if path == "api/cameras":
             return self._send(200, json.dumps([{
                 "name": c.get("name", ""), "mode": c.get("mode", ""),
@@ -785,7 +811,7 @@ INDEX_HTML = r"""<!doctype html>
         <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in the table below) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
         <div class="cfg-grid">
           <label>Control API token<input id="f-inject-token" type="text" placeholder="a long random secret (protects :8790)"></label>
-          <label>Default TTS engine<input id="f-tts-engine" type="text" placeholder="tts.google_en_com (for the text mode)"></label>
+          <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
         </div>
         <p class="sub" style="margin:6px 0 0">The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
       </div>
@@ -907,12 +933,27 @@ function renderForm(){
   document.getElementById('f-port').value = CFG.rtsp_port || 554;
   document.getElementById('f-path').value = CFG.default_path || '';
   var _it=document.getElementById('f-inject-token'); if(_it) _it.value = CFG.inject_token || '';
-  var _te=document.getElementById('f-tts-engine'); if(_te) _te.value = CFG.tts_engine || '';
+  populateTtsEngines();
   var _oc=(CFG.lan_ip||'').split('.');
   document.getElementById('f-ip1').value=_oc[0]||''; document.getElementById('f-ip2').value=_oc[1]||'';
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
   var head ='<tr><th>Name</th><th>Host</th><th>URL (override)</th><th>Path</th><th>Mode</th><th>Audio</th><th></th></tr>';
   document.getElementById('camrows').innerHTML = head + (CFG.cameras||[]).map(camRow).join('');
+}
+function populateTtsEngines(){
+  var sel = document.getElementById('f-tts-engine'); if(!sel) return;
+  var cur = CFG.tts_engine || '';
+  function render(engines){
+    var seen = {};
+    var opts = '<option value=""'+(cur===''?' selected':'')+'>(none)</option>';
+    engines.forEach(function(e){ if(!e.id || seen[e.id]) return; seen[e.id]=1;
+      var label = e.id + (e.name && e.name!==e.id ? '  ('+e.name+')' : '');
+      opts += '<option value="'+esc(e.id)+'"'+(e.id===cur?' selected':'')+'>'+esc(label)+'</option>'; });
+    if(cur && !seen[cur]) opts += '<option value="'+esc(cur)+'" selected>'+esc(cur)+'  (not detected)</option>';
+    sel.innerHTML = opts;
+  }
+  render([]);   // baseline (none + current) while the fetch runs
+  fetch('api/tts_engines').then(function(r){return r.json();}).then(function(r){ render((r&&r.engines)||[]); }).catch(function(){});
 }
 function camRow(c,i){
   c = c || {};
