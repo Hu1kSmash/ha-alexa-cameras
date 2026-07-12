@@ -8,6 +8,10 @@ one stream format Amazon's camera relay can actually decode — a plain go2rtc/H
 Assistant HLS feed shows up **black** on an Echo Show because its segments drop the
 in-band SPS/PPS headers. This add-on produces clean, decodable segments instead.
 
+It can also **mix spoken announcements into a camera's audio track** — so an "*a car is
+approaching*" message plays *through* the live camera view on the Echo instead of the
+usual Alexa announcement that tears the view down. See the **Audio injection** section below.
+
 Each camera you configure is served on the add-on's port **8888** at:
 
 - `http://<HA-IP>:8888/<name>/stream.m3u8` — the live HLS stream
