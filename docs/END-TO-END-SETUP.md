@@ -88,7 +88,7 @@ project, not this add-on:**
 Plus:
 
 - The **Alexa Cameras (HLS) add-on** installed and serving on your LAN (see the
-  [README](../README.md)).
+  [Documentation](../alexa_cameras/DOCS.md)).
 - Your **domain on Cloudflare** and the **Amazon Developer / AWS accounts** you
   already used for the skill above.
 
