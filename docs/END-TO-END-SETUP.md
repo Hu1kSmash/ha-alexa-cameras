@@ -265,46 +265,106 @@ the same "proxy directives to Home Assistant" Lambda, **plus** a
 `CameraStreamController` override: when Alexa asks to initialize a camera stream,
 it returns the **add-on's** H.264 MPEG-TS HLS URL instead of HA's built-in
 (fragmented-MP4 / LL-HLS) stream — which is the whole reason the Echo can decode
-it. Fill in `CAMERA_MAP` with one entry per camera you serve from the add-on.
+it. It also folds in the robustness of the community HA Smart Home Lambda
+([Jason Hu / Matthew Hilton](https://gist.github.com/matt2005/744b5ef548cc13d88d0569eea65f5e5b),
+Apache-2.0): request validation, **structured Alexa error responses** (a clean
+failure instead of a Lambda crash on an HA error), redacted debug logging, and an
+optional self-signed-cert toggle. Fill in `CAMERA_MAP` with one entry per camera
+you serve from the add-on.
+
+> **Auth model — leave it as-is unless you know you changed it.** This Lambda uses
+> your **`LONG_LIVED_ACCESS_TOKEN`** for every proxied request, which is the setup
+> this guide (and the HA "Login with Amazon" account-linking) describes. Only set
+> the new `USE_DIRECTIVE_TOKEN=True` env var if you deliberately linked the Alexa
+> skill to **Home Assistant's own OAuth** — otherwise the token Alexa sends can't be
+> validated by HA and every command returns 401. When in doubt, don't set it.
 
 ```python
-import os
 import json
-import uuid
 import logging
+import os
+import uuid
+from typing import Any, Optional
+
 import urllib3
 
-DEBUG = os.environ.get("DEBUG", "False") == "True"
-_logger = logging.getLogger()
+# ---- configuration (environment variables) ----------------------------------
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
+
+BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")                 # https://ha.example.com
+CAMERA_BASE_URL = os.environ.get("CAMERA_BASE_URL", "").rstrip("/")   # https://cam.example.com
+LONG_LIVED_ACCESS_TOKEN = os.environ.get("LONG_LIVED_ACCESS_TOKEN")
+
+# Auth model:
+#   default   -> use LONG_LIVED_ACCESS_TOKEN for every proxied request. This is this
+#                project's documented setup (Alexa account-linking via Login with Amazon,
+#                HA reached with a long-lived token) and is what keeps existing installs working.
+#   opt-in    -> set USE_DIRECTIVE_TOKEN=True ONLY if you linked the Alexa skill to Home
+#                Assistant's OWN OAuth; then the bearer token Alexa puts in each directive is
+#                used, with the long-lived token as a fallback.
+USE_DIRECTIVE_TOKEN = os.environ.get("USE_DIRECTIVE_TOKEN", "False").lower() in ("1", "true", "yes")
+
+# TLS verification for the call to Home Assistant. Leave ON (default). Only set
+# NOT_VERIFY_SSL=True if HA sits behind a self-signed cert (not needed with Cloudflare).
+VERIFY_SSL = os.environ.get("NOT_VERIFY_SSL", "False").lower() not in ("1", "true", "yes")
+
+# ---- logging ----------------------------------------------------------------
+_logger = logging.getLogger("ha-alexa-cameras")
 _logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
+if not _logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"))
+    _logger.addHandler(_handler)
+logging.getLogger("urllib3").setLevel(logging.INFO)
 
-BASE_URL = os.environ["BASE_URL"].rstrip("/")                # https://ha.example.com
-TOKEN = os.environ["LONG_LIVED_ACCESS_TOKEN"]
-CAMERA_BASE_URL = os.environ["CAMERA_BASE_URL"].rstrip("/")  # https://cam.example.com
-
+# ---- HTTP client (built once, reused across warm invocations) ---------------
 http = urllib3.PoolManager(
-    cert_reqs="CERT_REQUIRED",
+    cert_reqs="CERT_REQUIRED" if VERIFY_SSL else "CERT_NONE",
     timeout=urllib3.Timeout(connect=2.0, read=10.0),
 )
 
 # Map each camera's Home Assistant entity -> its add-on stream name.
 #   KEY   = the HA entity's object_id, i.e. the part after "camera." (Alexa sends it as
-#           the endpointId "camera#<object_id>"). So camera.front_porch -> key "front_porch".
+#           the endpointId "camera#<object_id>"). So camera.driveway -> key "driveway".
 #   VALUE = the add-on camera `name` -- the URL segment served at
 #           https://<your-domain>/<name>/stream.m3u8. The add-on enforces this to lowercase
 #           letters/numbers/underscore (no spaces/capitals), the same character set HA uses
 #           for entity object_ids.
 # Easiest: name the add-on camera exactly like the HA entity's object_id, so key == value.
 # (What Alexa *speaks* is the entity's friendly name -- set separately via entity_config below.)
+# These names match the "Example configuration" in alexa_cameras/DOCS.md.
 CAMERA_MAP = {
-    "frontporch": "frontporch",
-    "frontdriveway": "frontdriveway",
-    "garagedoors": "garagedoors",
+    "driveway": "driveway",
+    "porch": "porch",
+    "sideyard": "sideyard",
+    "garage": "garage",
+    "birdseye": "birdseye",     # only if you set up the birdseye follow-cam (bonus)
     # ...one line per camera you serve from the add-on...
 }
 
 
-def _camera_stream_override(event):
+def _alexa_error(error_type: str, message: str) -> dict:
+    """Minimal Alexa error event, so a failure shows cleanly instead of crashing the Lambda."""
+    return {"event": {"payload": {"type": error_type, "message": message}}}
+
+
+def _redacted(event: dict) -> str:
+    """Serialize an event for logging with any bearer token masked (tokens ride in the directive)."""
+    try:
+        clone = json.loads(json.dumps(event))
+        directive = clone.get("directive", {})
+        for holder in (directive.get("endpoint", {}).get("scope"),
+                       directive.get("payload", {}).get("grantee"),
+                       directive.get("payload", {}).get("scope")):
+            if isinstance(holder, dict) and "token" in holder:
+                holder["token"] = "***REDACTED***"
+        return json.dumps(clone)
+    except Exception:
+        return "<unserializable event>"
+
+
+def _camera_stream_override(event: dict) -> Optional[dict]:
     """If this is InitializeCameraStreams for a mapped camera, answer with the
     add-on's HLS URL. Otherwise return None to fall through to the HA proxy."""
     directive = event.get("directive", {})
@@ -344,28 +404,77 @@ def _camera_stream_override(event):
     }
 
 
-def lambda_handler(event, context):
+def _resolve_token(directive: dict) -> Optional[str]:
+    """Choose the bearer token to send to HA (see USE_DIRECTIVE_TOKEN)."""
+    if not USE_DIRECTIVE_TOKEN:
+        return LONG_LIVED_ACCESS_TOKEN
+    # Account-linking mode: token rides in endpoint.scope, payload.grantee (AcceptGrant),
+    # or payload.scope (Discovery).
+    scope = (directive.get("endpoint", {}).get("scope")
+             or directive.get("payload", {}).get("grantee")
+             or directive.get("payload", {}).get("scope"))
+    token = scope.get("token") if isinstance(scope, dict) else None
+    return token or LONG_LIVED_ACCESS_TOKEN
+
+
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if DEBUG:
-        _logger.debug("Event: %s", json.dumps(event))
+        _logger.debug("Event: %s", _redacted(event))
 
-    # 1) Camera stream requests: answer locally with the add-on's HLS URL.
-    cam_response = _camera_stream_override(event)
-    if cam_response is not None:
-        return cam_response
+    try:
+        # 1) Camera stream requests -> answer locally with the add-on's HLS URL.
+        #    (Runs before any auth/validation, so camera streaming works even if the
+        #     HA proxy is misconfigured.)
+        cam_response = _camera_stream_override(event)
+        if cam_response is not None:
+            _logger.info("Served camera stream override")
+            return cam_response
 
-    # 2) Everything else: proxy to Home Assistant's Alexa Smart Home endpoint.
-    resp = http.request(
-        "POST",
-        f"{BASE_URL}/api/alexa/smart_home",
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "Content-Type": "application/json",
-        },
-        body=json.dumps(event).encode("utf-8"),
-    )
-    if resp.status >= 400:
-        _logger.error("HA returned %s: %s", resp.status, resp.data[:500])
-    return json.loads(resp.data.decode("utf-8"))
+        # 2) Everything else -> proxy to Home Assistant. Validate first so a malformed
+        #    request returns a clean Alexa error instead of a stack trace.
+        if not BASE_URL:
+            raise ValueError("BASE_URL environment variable must be set")
+
+        directive = event.get("directive")
+        if directive is None:
+            raise ValueError("Malformed request: missing 'directive'")
+        payload_version = directive.get("header", {}).get("payloadVersion")
+        if payload_version != "3":
+            raise ValueError(f"Unsupported payloadVersion {payload_version!r} (expected '3')")
+
+        token = _resolve_token(directive)
+        if not token:
+            raise ValueError("No access token (set LONG_LIVED_ACCESS_TOKEN, or enable USE_DIRECTIVE_TOKEN)")
+
+        response = http.request(
+            "POST",
+            f"{BASE_URL}/api/alexa/smart_home",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            body=json.dumps(event).encode("utf-8"),
+        )
+
+        if response.status >= 400:
+            body = response.data.decode("utf-8", "replace")
+            _logger.error("Home Assistant returned %s: %s", response.status, body[:500])
+            error_type = ("INVALID_AUTHORIZATION_CREDENTIAL"
+                          if response.status in (401, 403) else "INTERNAL_ERROR")
+            return _alexa_error(error_type, f"Home Assistant responded {response.status}")
+
+        _logger.info("Proxied to Home Assistant OK (%s)", response.status)
+        return json.loads(response.data.decode("utf-8"))
+
+    except (ValueError, KeyError, json.JSONDecodeError) as e:
+        _logger.exception("Bad request")
+        return _alexa_error("INVALID_REQUEST", str(e))
+    except urllib3.exceptions.HTTPError:
+        _logger.exception("Network error talking to Home Assistant")
+        return _alexa_error("ENDPOINT_UNREACHABLE", "Could not reach Home Assistant")
+    except Exception:
+        _logger.exception("Unexpected error")
+        return _alexa_error("INTERNAL_ERROR", "An unexpected error occurred")
 ```
 
 > HA still advertises the `CameraStreamController` capability during discovery, so
@@ -381,12 +490,14 @@ this:
 
 ![Lambda environment variables](images/lambda-environment-variables.png)
 
-| Key | Value |
-|---|---|
-| `BASE_URL` | your Home Assistant external URL, e.g. `https://ha.example.com` |
-| `CAMERA_BASE_URL` | the add-on's public base from step [2], e.g. `https://cam.example.com` |
-| `LONG_LIVED_ACCESS_TOKEN` | a Home Assistant Long-Lived Access Token (HA → profile → Security → Create Token) |
-| `DEBUG` | `True` while setting up (verbose CloudWatch logs); set `False` later |
+| Key | Required | Value |
+|---|---|---|
+| `BASE_URL` | **Yes** | your Home Assistant external URL, e.g. `https://ha.example.com` |
+| `CAMERA_BASE_URL` | **Yes** | the add-on's public base from step [2], e.g. `https://cam.example.com` |
+| `LONG_LIVED_ACCESS_TOKEN` | **Yes** | a Home Assistant Long-Lived Access Token (HA → profile → Security → Create Token) |
+| `DEBUG` | No | `True` while setting up (verbose CloudWatch logs, with the auth token redacted); set `False` later |
+| `USE_DIRECTIVE_TOKEN` | No | Leave **unset**. Set `True` only if you linked the skill to Home Assistant's own OAuth (not the Login-with-Amazon flow this guide uses) — see the auth-model note above. |
+| `NOT_VERIFY_SSL` | No | Leave **unset** (HA's TLS cert is verified). Set `True` only if Home Assistant is behind a self-signed certificate — not needed with a Cloudflare Tunnel. |
 
 Then finish the HA guide (account linking + *"Alexa, discover devices"*) and
 continue to [step 5](#5-home-assistant-configuration).
@@ -424,11 +535,11 @@ alexa:
     # Clean spoken Alexa names (survive re-discovery, unlike renaming in the app).
     # The entity id stays as-is; only the Alexa-facing name changes.
     entity_config:
-      camera.frontporch:
-        name: "Front Porch"
-      camera.frontdriveway:
-        name: "Front Driveway"
-      # ...one per camera...
+      camera.driveway:
+        name: "Driveway"
+      camera.porch:
+        name: "Porch"
+      # ...one per camera (keys match CAMERA_MAP in the Lambda above)...
       camera.birdseye:           # only if you set up the birdseye follow-cam (bonus)
         name: "Birdseye"
 ```
