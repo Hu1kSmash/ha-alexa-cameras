@@ -140,7 +140,7 @@ problem) apart from "the stream never arrived" (tunnel / WAF).
 
 ---
 
-## Step 2 — Cloudflare Tunnel: expose the add-on over HTTPS
+## Step 2 — Cloudflare Tunnel: Expose the Add-on over HTTPS
 
 Alexa needs your stream at **`https://<your-domain>/…`** with a **publicly-trusted
 certificate**. A Cloudflare Tunnel gives you that without opening any ports.
@@ -219,7 +219,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<your-domain>/<name>/stream.m3u
 
 ---
 
-## Step 3 — Cloudflare WAF: lock the camera host to Amazon only
+## Step 3 — Cloudflare WAF: Lock the Camera Host to Amazon Only
 
 The camera host needs two things, and **one rule handles both**:
 
@@ -258,7 +258,7 @@ and Amazon's relay (which the rule does **not** match) passes straight through.
 
 ---
 
-## Step 4 — The Alexa Smart Home skill + AWS Lambda
+## Step 4 — The Alexa Smart Home Skill + AWS Lambda
 
 The skill, the AWS Lambda, the Login with Amazon security profile, and account
 linking are the **standard Home Assistant self-hosted Alexa Smart Home setup**.
@@ -515,7 +515,7 @@ continue to [Step 5](#step-5--home-assistant-configuration).
 
 ---
 
-## Step 5 — Home Assistant configuration
+## Step 5 — Home Assistant Configuration
 
 The base `alexa: smart_home:` block is part of the
 [HA guide](https://www.home-assistant.io/integrations/alexa.smart_home/). The
@@ -577,14 +577,14 @@ Naming gotchas learned the hard way:
 
 ---
 
-## Step 6 — Test the whole chain
+## Step 6 — Test the Whole Chain
 
 1. **Discover:** *"Alexa, discover devices"* (or Alexa app → Devices → **+**).
    Your cameras appear with the `entity_config` names.
 2. **Show:** *"Alexa, show camera porch"* on an Echo Show. Expect a live view
    within ~2–4 seconds.
 3. If a snapshot appears but the live view is black, work through
-   [Troubleshooting](#step-7--troubleshooting) — it's almost always codec, cert, or WAF.
+   [Troubleshooting](#troubleshooting) — it's almost always codec, cert, or WAF.
 
 The add-on's **Public URL check** tab confirms the tunnel + WAF from Home Assistant's
 side — a green **`403`** per camera is the ideal result (reachable, and locked to Amazon):
@@ -593,7 +593,7 @@ side — a green **`403`** per camera is the ideal result (reachable, and locked
 
 ---
 
-## Step 7 — Troubleshooting
+## Troubleshooting
 
 Work top-down; each check isolates one link in the chain.
 
