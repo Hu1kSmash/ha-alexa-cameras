@@ -14,7 +14,7 @@ wires up the other four and ties everything together.
 > 1. **Read the [README](../README.md)** for *why* the stream has to look the way it
 >    does (Alexa's relay only plays H.264 Baseline MPEG-TS HLS over HTTPS with in-band
 >    SPS/PPS). This guide assumes you understand that constraint.
-> 2. **Install and configure the add-on itself, using its [DOCS.md](../alexa_cameras/DOCS.md).**
+> 2. **Install and configure the add-on itself, using its [Documentation](../alexa_cameras/DOCS.md).**
 >    Add your cameras in the add-on's Web UI, pick `copy` vs `transcode`, and get every
 >    camera reading **green on the Validate streams tab** — i.e. `http://<ha-host>:8888/<name>/stream.m3u8`
 >    is live, decodable H.264 **on your LAN** — *before* you touch anything below.
