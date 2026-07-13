@@ -23,7 +23,7 @@ wires up the other four and ties everything together.
 > tunnel, WAF, skill/Lambda). If the add-on isn't serving a good stream on `:8888` first,
 > none of the external steps here can fix that — so get that part solid, then come back.
 
-## Quick start
+## Quick Start
 
 The whole build as a checklist — each item links to its full section.
 **You must already have a working Cloudflare tunnel to Home Assistant and a working
@@ -625,7 +625,7 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 5 -f null -
 
 ---
 
-## Appendix: latency & quality notes
+## Appendix: Latency & Quality Notes
 
 - **~3 seconds** glass-to-glass is the practical floor: Amazon's relay does **not**
   support LL-HLS, so 1-second plain-HLS segments are as low as it goes.
