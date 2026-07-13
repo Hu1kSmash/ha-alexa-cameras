@@ -118,7 +118,7 @@ full `url`.
 | **Path** (`path`) | No | Overrides the **Default RTSP path** for this **one** camera only. Use it when most of your cameras share a path but one is different — for example, a camera that only exposes its high-res **main** stream (`/cam/realmonitor?channel=1&subtype=0`). Leave it blank to use the Default RTSP path above. Ignored when the camera uses a full **URL**. |
 | **Mode** (`mode`) | **Yes** | How the add-on prepares this camera's video for Alexa — the single most important per-camera choice, since it decides whether the add-on uses ~0% CPU or a real chunk of a core:<br>• **`copy`** — the source is *already* H.264 (Baseline/Main), so ffmpeg only **remuxes** it into MPEG-TS. Near-zero CPU. **Use this whenever you can.**<br>• **`transcode`** — the source is **H.265/HEVC**, H.264 **High** profile, or otherwise not Alexa-decodable, so ffmpeg **re-encodes** it (scales to 1280×720, H.264 Baseline). ~0.3–0.5 of a core per camera — use only where `copy` won't work.<br>**Rule of thumb:** try **`copy`** first; if the Echo shows a **black screen** but the snapshot works, the source needs **`transcode`**.<br>**Tip (Amcrest/Dahua & most NVRs):** set the camera's **sub / second stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `copy`. Reserve `transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**). |
 | **Audio** (`audio_source`) | No | Optional. Lets an Alexa announcement play **through this camera's sound** instead of interrupting the live view. Leave it blank for normal behaviour (the camera's own audio, if it has any).<br>• **`inject`** — replace the camera's audio with the announcement (good for silent cameras like Frigate birdseye).<br>• **`inject_mix`** — keep the camera's own audio and mix the announcement on top (needs a camera that actually has audio).<br>Only relevant if you use the **Audio injection** feature (below). |
-| **On-demand** (`on_demand`) | No | Tick this for a source that's **expected to be idle / absent / `404` when nothing's consuming it** — most notably a Frigate **birdseye** feed, whose go2rtc encoder pauses when idle (see the **Frigate birdseye** notes under *Validate streams*). When set, the add-on treats that camera's idle state as *normal* and, importantly, **stops hammering it**: it **backs off with a gentle exponential retry (30 s → 5 min)** instead of reconnecting aggressively — which is what prevents the add-on from churning and *wedging* a fragile on-demand encoder. It also **quiets the repeated `404` / connection errors** in the Logs (announcing the wait once), **excludes the camera from the stall watchdog**, and shows it as **Idle** (not red/amber) in Validate streams. Leave it off for normal always-on cameras, where those errors *are* real problems. |
+| **On-demand** (`on_demand`) | No | Tick this for a source that's **expected to be idle / absent / `404` when nothing's consuming it** — most notably a Frigate **birdseye** feed, whose go2rtc encoder pauses when idle (see the **Frigate birdseye** notes under *Validate streams*). When set, the add-on makes the camera **truly lazy: it connects to the source *only while something is actually watching* and makes zero connections when idle.** It starts pulling the stream the moment Alexa (or the auto-show automation, or a browser) requests it, and disconnects again ~45 s after the last request. That "don't touch it unless watched" behaviour is what prevents the add-on from churning and *wedging* a fragile on-demand encoder. It also **quiets the predictable `404` / connection errors** in the Logs, **excludes the camera from the stall watchdog**, and shows it as **Idle** (not red/amber) in Validate streams. (If a *requested* source still can't produce, the add-on backs off 5 s → 5 min before retrying, so even active viewing can't hammer it.) Leave it off for normal always-on cameras, where those errors *are* real problems. |
 
 ### Audio injection
 
@@ -273,14 +273,18 @@ switch to `copy` and save CPU — while **frontporch** and **officesideyard** on
 > in a browser or in Validate does the same. That ~30 s cold-start is normal for an on-demand encoder
 > — viewing it *does* wake it, it's just not instant.
 >
-> **The part that actually matters — don't let the add-on hammer it.** Reconnecting to birdseye over
-> and over churns that hardware encoder, and under enough churn it can **wedge**: the `h264_qsv` exec
-> times out and it can cascade into Frigate's detect/record pipeline (detection and automations stop
-> firing). So for birdseye — or *any* source that's expected to be idle/absent — **tick On-demand**
-> (`on_demand: true`). The add-on then **backs off gently** (a 30 s → 5 min retry instead of hammering),
+> **The part that actually matters — don't let the add-on touch it unless someone's watching.**
+> Reconnecting to birdseye over and over churns that hardware encoder, and under enough churn it can
+> **wedge**: the `h264_qsv` exec times out and it can cascade into Frigate's detect/record pipeline
+> (detection and automations stop firing). So for birdseye — or *any* source that's expected to be
+> idle/absent — **tick On-demand** (`on_demand: true`). The add-on then runs it **truly lazily: it
+> makes no connection at all while nothing's watching, and pulls the stream only while it's actually
+> being viewed** (Alexa, the auto-show automation, or a browser), dropping it again ~45 s after the
+> last request. Idle birdseye = the add-on isn't connected to it, so there's nothing to churn. It also
 > quiets that camera's logs, skips the stall watchdog, and validates it as **Idle** rather than
-> red/amber. That's the *"hands-off, don't try to keep it warm"* mode, and it's the right way to run
-> an on-demand source.
+> red/amber. (Even while it *is* being watched, if the source can't produce the add-on backs off
+> 5 s → 5 min before retrying, so viewing can't hammer it either.) That's the right way to run an
+> on-demand source.
 >
 > **Normal vs. broken:**
 > - **Idle `404` / Source-timeout / Output "not advancing" on birdseye** = normal (the encoder is
@@ -512,10 +516,17 @@ expose it to the internet, and protect it with `inject_token`.
 
 ## How restarts & logging work
 
-- Each camera runs as its **own** ffmpeg process — one bad camera can't take down the
-  others — and is restarted automatically with **exponential backoff** (3s → 60s, reset
-  after a healthy run) so a camera failing on bad credentials isn't hammered (some lock
+- Each **always-on** camera runs as its **own** ffmpeg process — one bad camera can't take
+  down the others — and is restarted automatically with **exponential backoff** (3s → 60s,
+  reset after a healthy run) so a camera failing on bad credentials isn't hammered (some lock
   out an IP after repeated failed logins).
+- An **on-demand** camera (`on_demand: true`) is different: it runs **lazily** — no ffmpeg and
+  **no source connection at all while nothing's watching**. The add-on's file server notes each
+  request for the camera; ffmpeg starts the moment it's actually viewed (Alexa, the auto-show
+  automation, a browser) and is dropped ~45 s after the last request. This is what keeps the
+  add-on from churning a fragile on-demand encoder like Frigate birdseye. If a *requested* source
+  still won't produce, it backs off 5s → 5min before retrying so even active viewing can't hammer
+  it. On-demand cameras are excluded from the stall watchdog (idle is normal for them).
 - A **stall watchdog** covers the other failure mode: an ffmpeg that keeps *running* but
   stops producing (a frozen mux). If a camera's playlist stops advancing for ~60s it
   restarts **only that camera's** worker (never the add-on, never the other cameras), up
