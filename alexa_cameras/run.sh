@@ -79,6 +79,14 @@ PY
 )
 }
 
+# True if file $1 exists and was touched within $2 seconds. The freshness of
+# /tmp/ondemand/<cam>.req (touched by hlsd.py on each client request) IS the demand signal
+# for a lazy on_demand camera.
+req_fresh() {
+  [ -f "$1" ] || return 1
+  [ "$(( $(date +%s) - $(stat -c %Y "$1" 2>/dev/null || echo 0) ))" -lt "$2" ]
+}
+
 # copy  = camera stream is already H.264 -> remux only (near-zero CPU)
 # transcode = source is H.265/other -> scale to 720p H.264 Baseline for Alexa
 hls_loop() {
@@ -142,20 +150,18 @@ hls_loop() {
               -map "[vout]" -map "[aout]" -max_interleave_delta 0)
       fi ;;
   esac
-  # Exponential backoff (3s -> 60s). A failing camera (e.g. bad credentials)
-  # must NOT be retried every 3s: some cameras lock out an IP after repeated
-  # failed logins. Backoff resets to 3s only after a healthy (>=30s) run.
-  # No input read-timeout on purpose — ffmpeg waits patiently for the first
-  # keyframe, which matters for on-demand sources (e.g. Frigate birdseye).
-  # An `on_demand` source (Frigate birdseye etc.) is EXPECTED to be absent/404 when idle.
-  # For those: filter the predictable "source down" noise out of the log, announce the wait
-  # just once, and retry on a calm fixed interval instead of spamming an error every ~30s.
+  # An `on_demand` source (Frigate birdseye) is expected to be absent when idle; filter its
+  # predictable "source down" noise out of the log.
   local NOISE='method DESCRIBE failed|Error opening input|Server returned 404|404 Not Found|Connection refused|Connection timed out|Immediate exit requested'
-  local delay=3 start ran waiting=0 mtime
   local -a filt=(cat)
   [ "$on_demand" = "1" ] && filt=(grep -vE "$NOISE")
-  while true; do
-    start=$(date +%s)
+
+  # The ffmpeg invocation, built once (reads the src/venc/ain/amap/filt set above). No input
+  # read-timeout on purpose — ffmpeg waits patiently for the first keyframe, which matters for a
+  # slow-to-start source. Backgrounding this pipeline makes $! the LAST stage (sed), so to stop
+  # the actual ffmpeg the callers pkill on the unique segment path (which the snapshot ffmpeg,
+  # reading only stream.m3u8, does NOT carry).
+  _run_ffmpeg() {
     ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
       -rtsp_transport tcp -i "$src" ${ain[@]+"${ain[@]}"} \
       ${amap[@]+"${amap[@]}"} "${venc[@]}" -c:a aac -ar 48000 -ac 2 -b:a 64k \
@@ -164,32 +170,55 @@ hls_loop() {
       -hls_segment_type mpegts -hls_allow_cache 0 \
       -hls_segment_filename "$HLS/$cam/seg_%05d.ts" "$HLS/$cam/stream.m3u8" \
       2>&1 | "${filt[@]}" | sed "s/^/[$cam] /"
-    ran=$(( $(date +%s) - start ))
-    if [ "$on_demand" = "1" ]; then
-      # HANDS-OFF. An on-demand source (Frigate birdseye) may be idle/absent for long stretches,
-      # and repeatedly reconnecting *hammers the upstream* — with birdseye that churns go2rtc's
-      # QSV encoder until it wedges Frigate. So we do NOT try to keep it warm: back off
-      # exponentially (30s -> 5 min) so we barely poke it. Decide "did this attempt SERVE?" by
-      # fresh OUTPUT (a playlist written in the last ~10s), NOT by run duration: a *failed* connect
-      # to a slow source (birdseye's ~30s QSV spin-up, which go2rtc then kills) also lasts ~30s, so
-      # a duration test would misread the failure as a success, reset the backoff, and churn.
+  }
+
+  if [ "$on_demand" = "1" ]; then
+    # LAZY on-demand. Do NOT connect to the source while nothing is watching — that idle polling
+    # is what churns a fragile upstream (Frigate birdseye's go2rtc QSV encoder) until it wedges.
+    # hlsd.py (the :8888 server) touches /tmp/ondemand/<cam>.req on every client request; we run
+    # ffmpeg only while that file is fresh, then reap it once the stream goes unrequested. Idle =
+    # zero source connections = zero churn. If a started ffmpeg produces NO output (the ~30s
+    # birdseye cold-start losing the race with go2rtc's exec-timeout), we still back off
+    # (5s -> 5 min) before any retry, so even under sustained demand a failing source can't be hammered.
+    local REQ="/tmp/ondemand/$cam.req" IDLE=45 delay=5 mtime parked=0 ff
+    mkdir -p /tmp/ondemand
+    while true; do
+      if ! req_fresh "$REQ" "$IDLE"; then
+        [ "$parked" = "0" ] && { echo "[$(date +%H:%M:%S)] $cam (on-demand) idle — not connecting until requested"; parked=1; }
+        sleep 2; continue
+      fi
+      parked=0
+      echo "[$(date +%H:%M:%S)] $cam (on-demand) requested — starting stream"
+      _run_ffmpeg &
+      ff=$!
+      while kill -0 "$ff" 2>/dev/null; do
+        req_fresh "$REQ" "$IDLE" || { echo "[$(date +%H:%M:%S)] $cam (on-demand) unrequested ${IDLE}s — stopping"; pkill -f "$HLS/$cam/seg_" 2>/dev/null; break; }
+        sleep 3
+      done
+      wait "$ff" 2>/dev/null
+      # Did it actually serve? (fresh playlist just before it stopped.) Then a quick reset. If it
+      # produced nothing, back off — even under continued demand — so a failing source isn't hammered.
       mtime=$(stat -c %Y "$HLS/$cam/stream.m3u8" 2>/dev/null || echo 0)
+      rm -f "$HLS/$cam/stream.m3u8" "$HLS/$cam/"*.ts 2>/dev/null   # clear so the next view cold-starts clean
       if [ "$(( $(date +%s) - mtime ))" -lt 10 ]; then
-        delay=30; waiting=0
-      elif [ "$waiting" = "0" ]; then
-        echo "[$(date +%H:%M:%S)] $cam (on-demand) source not producing — waiting quietly; backing off to gentle retries (up to 5 min)"
-        waiting=1; delay=30
+        delay=5
       else
         delay=$(( delay * 2 )); [ "$delay" -gt 300 ] && delay=300
+        echo "[$(date +%H:%M:%S)] $cam (on-demand) produced no output — backing off ${delay}s before any retry"
       fi
       sleep "$delay"
-      continue
-    fi
-    if [ "$ran" -ge 30 ]; then
-      delay=3
-    else
-      delay=$(( delay * 2 )); [ "$delay" -gt 60 ] && delay=60
-    fi
+    done
+  fi
+
+  # Normal always-on camera: persistent worker + exponential backoff (3s -> 60s). A failing camera
+  # (bad credentials) must NOT be retried every 3s — some lock out an IP after repeated failed
+  # logins; backoff resets to 3s after a healthy (>=30s) run.
+  local delay=3 start ran
+  while true; do
+    start=$(date +%s)
+    _run_ffmpeg
+    ran=$(( $(date +%s) - start ))
+    if [ "$ran" -ge 30 ]; then delay=3; else delay=$(( delay * 2 )); [ "$delay" -gt 60 ] && delay=60; fi
     echo "[$(date +%H:%M:%S)] $cam stream exited after ${ran}s; restarting in ${delay}s"
     sleep "$delay"
   done
@@ -279,7 +308,7 @@ trap 'kill 0' EXIT INT TERM
 start_workers
 # HLS/snapshot file server (what the tunnel/reverse proxy points at) + the
 # ingress UI, both in the background so this script can watch for config reloads.
-( cd "$HLS" && python3 -m http.server 8888 ) &
+python3 /hlsd.py &
 python3 /ui.py &
 # Birdseye audio injector (experimental): feeds inject-mode cameras' FIFOs with
 # real-time silence + spliced announcements, and serves POST /say on :8790. Kept in

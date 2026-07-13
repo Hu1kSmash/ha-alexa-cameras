@@ -6,6 +6,7 @@ FROM ${BUILD_FROM}
 RUN apk add --no-cache bash ffmpeg python3 py3-yaml procps
 
 COPY run.sh /run.sh
+COPY hlsd.py /hlsd.py
 COPY ui.py /ui.py
 COPY injector.py /injector.py
 COPY config.yaml /manifest.yaml

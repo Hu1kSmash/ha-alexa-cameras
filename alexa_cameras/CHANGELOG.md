@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.10.0
+
+- **`on_demand` cameras are now truly lazy — zero source connections while nothing is watching.**
+  Previously an on-demand camera still *polled* its source on a backoff (retrying every ~30s → 5
+  min just to see if it was up). That polling was itself what churned a fragile upstream: each poke
+  at Frigate **birdseye** restarted go2rtc's `h264_qsv` encoder, and repeated pokes wedged Frigate.
+  Now the add-on connects **only while the stream is actually being requested**. The new `:8888`
+  file server (`hlsd.py`) records each client request (Alexa, the auto-show automation, a browser);
+  `run.sh` starts ffmpeg for an on-demand camera only while those requests are fresh and **reaps it
+  ~45s after they stop**. Idle on-demand camera = no ffmpeg, no source connection, nothing to churn.
+  If a requested source produces no output (e.g. birdseye losing the cold-start race), it still
+  backs off (5s → 5 min) before any retry, so even under sustained demand it can't be hammered.
+- Always-on cameras are unchanged (persistent worker, 3s → 60s restart backoff).
+
 ## 1.9.9
 
 - **Fix: `on_demand` backoff now actually backs off.** 1.9.8 decided whether an attempt had *served*
