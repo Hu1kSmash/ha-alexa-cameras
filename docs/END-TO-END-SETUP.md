@@ -108,9 +108,9 @@ Throughout, replace:
 You set this up when you followed the add-on's **[Documentation](../alexa_cameras/DOCS.md)**.
 Before wiring anything external, **confirm your cameras are healthy on your LAN** — the
 add-on's **Validate streams** tab is the easiest way. Every camera should read **green**:
-its **Source** and **Output** are both live, decodable **H.264 Baseline/Main**. This is the
-whole point — if a camera's output isn't Baseline/Main here, the Echo will show black no
-matter how the tunnel and skill are set up. **Get every camera green before you proceed.**
+its **Source** and **Output** are both live, decodable **H.264 Baseline/Main**. If a
+camera's output isn't Baseline/Main here, the Echo will show black no matter how the tunnel
+and skill are set up. **Get every camera green before you proceed.**
 
 ![The add-on's Validate streams tab — each camera's Source and Output confirmed as live, decodable H.264](images/validate-streams.png)
 
