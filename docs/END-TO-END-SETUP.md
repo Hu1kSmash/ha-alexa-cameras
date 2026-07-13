@@ -106,17 +106,13 @@ Throughout, replace:
 ## [1] The add-on (recap)
 
 You set this up when you followed the add-on's **[Documentation](../alexa_cameras/DOCS.md)**.
-Before wiring anything external, confirm it's healthy on your LAN — the add-on's own
-**Web UI** is the easiest way:
+Before wiring anything external, **confirm your cameras are healthy on your LAN** — the
+add-on's **Validate streams** tab is the easiest way. Every camera should read **green**:
+its **Source** and **Output** are both live, decodable **H.264 Baseline/Main**. This is the
+whole point — if a camera's output isn't Baseline/Main here, the Echo will show black no
+matter how the tunnel and skill are set up. **Get every camera green before you proceed.**
 
-- **Validate streams** tab — every camera should read **green**: its **Source** and
-  **Output** are both live, decodable **H.264 Baseline/Main**. This is the whole point —
-  if the output isn't Baseline/Main here, the Echo will show black no matter how the
-  tunnel and skill are set up.
-- **Configuration** tab — make sure the required **Home Assistant IP** is set (a private
-  IPv4, *not* a hostname); the *Served at* and *Public URL check* links depend on it.
-
-![The add-on's Configuration tab](images/config-tab.png)
+![The add-on's Validate streams tab — each camera's Source and Output confirmed as live, decodable H.264](images/validate-streams.png)
 
 Two more tabs matter later: once the tunnel + Lambda are up, **Public URL check** tests
 the external URL (a **403** there = reachable + WAF-locked, which is what you want), and
