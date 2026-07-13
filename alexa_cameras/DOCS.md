@@ -141,9 +141,8 @@ camera. The **View as YAML** toggle in the Configuration tab shows your live con
 
 ### Option A — direct from each camera (default)
 
-The add-on connects **straight to each camera's RTSP**. Simplest, and **self-contained**: nothing
-else has to be running for these to serve, so a camera stays available on Alexa even if your
-NVR / Frigate is down.
+The add-on connects **straight to each camera's RTSP** — the simplest setup: it maintains a stream
+to each camera with no additional configuration necessary.
 
 ```yaml
 lan_ip: 192.168.1.100                                # Home Assistant server's LAN IP (required)
