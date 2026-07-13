@@ -504,8 +504,8 @@ cameras:
     url: rtsp://ccab4aaf-frigate:8554/birdseye
     mode: transcode
     audio_source: inject          # birdseye is silent -> replace
-  - name: frontdoorbell
-    host: 192.168.1.207
+  - name: doorbell
+    host: 192.168.1.200
     mode: copy
     audio_source: inject_mix      # keep the doorbell's audio, announce over it
 
