@@ -29,19 +29,19 @@ The whole build as a checklist — each item links to its full section.
 **You must already have a working Cloudflare tunnel to Home Assistant and a working
 self-hosted Alexa Smart Home skill** (see [Prerequisites](#prerequisites)).
 
-1. **[Add-on](#1-the-add-on-recap)** — install Alexa Cameras (HLS), add your
+1. **[Add-on](#step-1--install--configure-the-add-on)** — install Alexa Cameras (HLS), add your
    cameras, confirm `http://<ha-host>:8888/<name>/stream.m3u8` is **decodable H.264**.
-2. **[Tunnel route](#2-cloudflare-tunnel--expose-the-add-on-over-https)** — route a
+2. **[Tunnel route](#step-2--cloudflare-tunnel-expose-the-add-on-over-https)** — route a
    camera subdomain through your existing Cloudflare tunnel to `<ha-host>:8888`
    (your HA server's LAN IP).
-3. **[WAF](#3-cloudflare-waf--lock-the-camera-host-to-amazon-only)** — lock the camera
+3. **[WAF](#step-3--cloudflare-waf-lock-the-camera-host-to-amazon-only)** — lock the camera
    host to Amazon's AWS ASNs (**16509 / 14618**) only; everyone else is blocked.
-4. **[Lambda](#4-the-alexa-smart-home-skill--aws-lambda)** — add the
+4. **[Lambda](#step-4--the-alexa-smart-home-skill--aws-lambda)** — add the
    `CameraStreamController` override + `CAMERA_BASE_URL` env var to your existing
    Alexa Smart Home Lambda.
-5. **[HA config](#5-home-assistant-configuration)** — expose the cameras, exclude
+5. **[HA config](#step-5--home-assistant-configuration)** — expose the cameras, exclude
    clutter, name them; restart HA; *"Alexa, discover devices."*
-6. **[Test](#6-test-the-whole-chain)** — *"Alexa, show camera &lt;name&gt;."*
+6. **[Test](#step-6--test-the-whole-chain)** — *"Alexa, show camera &lt;name&gt;."*
 
 ---
 
@@ -103,7 +103,7 @@ Throughout, replace:
 
 ---
 
-## [1] The add-on (recap)
+## Step 1 — Install & Configure the Add-on
 
 You set this up when you followed the add-on's **[Documentation](../alexa_cameras/DOCS.md)**.
 Before wiring anything external, **confirm your cameras are healthy on your LAN** — the
@@ -131,7 +131,7 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 4 -f null -
 **Verify the Public URL** once your tunnel and Lambda are up: the **Public URL check** tab
 confirms them from Home Assistant's side — a green **`403`** per camera is the goal, meaning
 the stream is reachable *and* locked to Amazon (exactly what the
-[WAF rule](#3-cloudflare-waf--lock-the-camera-host-to-amazon-only) does). And during the
+[WAF rule](#step-3--cloudflare-waf-lock-the-camera-host-to-amazon-only) does). And during the
 final test, the **Logs** tab shows a `GET /<name>/stream.m3u8` from a **`172.x`** address the
 instant Amazon's relay reaches the add-on — the fastest way to tell a "black Echo" (a codec
 problem) apart from "the stream never arrived" (tunnel / WAF).
@@ -140,7 +140,7 @@ problem) apart from "the stream never arrived" (tunnel / WAF).
 
 ---
 
-## [2] Cloudflare Tunnel — expose the add-on over HTTPS
+## Step 2 — Cloudflare Tunnel: expose the add-on over HTTPS
 
 Alexa needs your stream at **`https://<your-domain>/…`** with a **publicly-trusted
 certificate**. A Cloudflare Tunnel gives you that without opening any ports.
@@ -219,7 +219,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://<your-domain>/<name>/stream.m3u
 
 ---
 
-## [3] Cloudflare WAF — lock the camera host to Amazon only
+## Step 3 — Cloudflare WAF: lock the camera host to Amazon only
 
 The camera host needs two things, and **one rule handles both**:
 
@@ -258,7 +258,7 @@ and Amazon's relay (which the rule does **not** match) passes straight through.
 
 ---
 
-## [4] The Alexa Smart Home skill + AWS Lambda
+## Step 4 — The Alexa Smart Home skill + AWS Lambda
 
 The skill, the AWS Lambda, the Login with Amazon security profile, and account
 linking are the **standard Home Assistant self-hosted Alexa Smart Home setup**.
@@ -496,7 +496,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
 The HA guide has you set `BASE_URL`, `LONG_LIVED_ACCESS_TOKEN`, and `DEBUG`. Add
 **one more** — `CAMERA_BASE_URL`, the add-on's public HTTPS base (the Cloudflare
-Tunnel hostname from step [2]). Your Lambda's environment variables should look like
+Tunnel hostname from Step 2). Your Lambda's environment variables should look like
 this:
 
 ![Lambda environment variables](images/lambda-environment-variables.png)
@@ -504,18 +504,18 @@ this:
 | Key | Required | Value |
 |---|---|---|
 | `BASE_URL` | **Yes** | your Home Assistant external URL, e.g. `https://ha.example.com` |
-| `CAMERA_BASE_URL` | **Yes** | the add-on's public base from step [2], e.g. `https://cam.example.com` |
+| `CAMERA_BASE_URL` | **Yes** | the add-on's public base from Step 2, e.g. `https://cam.example.com` |
 | `LONG_LIVED_ACCESS_TOKEN` | **Yes** | a Home Assistant Long-Lived Access Token (HA → profile → Security → Create Token) |
 | `DEBUG` | No | `True` while setting up (verbose CloudWatch logs, with the auth token redacted); set `False` later |
 | `USE_DIRECTIVE_TOKEN` | No | Leave **unset**. Set `True` only if you linked the skill to Home Assistant's own OAuth (not the Login-with-Amazon flow this guide uses) — see the auth-model note above. |
 | `NOT_VERIFY_SSL` | No | Leave **unset** (HA's TLS cert is verified). Set `True` only if Home Assistant is behind a self-signed certificate — not needed with a Cloudflare Tunnel. |
 
 Then finish the HA guide (account linking + *"Alexa, discover devices"*) and
-continue to [step 5](#5-home-assistant-configuration).
+continue to [Step 5](#step-5--home-assistant-configuration).
 
 ---
 
-## [5] Home Assistant configuration
+## Step 5 — Home Assistant configuration
 
 The base `alexa: smart_home:` block is part of the
 [HA guide](https://www.home-assistant.io/integrations/alexa.smart_home/). The
@@ -577,14 +577,14 @@ Naming gotchas learned the hard way:
 
 ---
 
-## [6] Test the whole chain
+## Step 6 — Test the whole chain
 
 1. **Discover:** *"Alexa, discover devices"* (or Alexa app → Devices → **+**).
    Your cameras appear with the `entity_config` names.
 2. **Show:** *"Alexa, show camera porch"* on an Echo Show. Expect a live view
    within ~2–4 seconds.
 3. If a snapshot appears but the live view is black, work through
-   [Troubleshooting](#7-troubleshooting) — it's almost always codec, cert, or WAF.
+   [Troubleshooting](#step-7--troubleshooting) — it's almost always codec, cert, or WAF.
 
 The add-on's **Public URL check** tab confirms the tunnel + WAF from Home Assistant's
 side — a green **`403`** per camera is the ideal result (reachable, and locked to Amazon):
@@ -593,14 +593,14 @@ side — a green **`403`** per camera is the ideal result (reachable, and locked
 
 ---
 
-## [7] Troubleshooting
+## Step 7 — Troubleshooting
 
 Work top-down; each check isolates one link in the chain.
 
 | Symptom | Likely cause | Check / fix |
 |---|---|---|
 | **"I couldn't find a device called …"** | Not discovered / name mismatch | Re-discover; confirm the camera is in the `filter:`; try `"show camera <name>"`; check `entity_config` name. |
-| **"…isn't responding" / black, no snapshot** | Relay can't reach the stream | Tunnel down / wrong route, **or** Bot Fight Mode challenging Amazon — Cloudflare **Security → Events**: a **Managed Challenge / 403 from an AWS ASN** on `/…/stream.m3u8` means bot protection is blocking the relay (see [WAF](#3-cloudflare-waf--lock-the-camera-host-to-amazon-only)). |
+| **"…isn't responding" / black, no snapshot** | Relay can't reach the stream | Tunnel down / wrong route, **or** Bot Fight Mode challenging Amazon — Cloudflare **Security → Events**: a **Managed Challenge / 403 from an AWS ASN** on `/…/stream.m3u8` means bot protection is blocking the relay (see [WAF](#step-3--cloudflare-waf-lock-the-camera-host-to-amazon-only)). |
 | **Snapshot shows, but live is black** | Stream is fetched but **undecodable** | `ffmpeg -v error -i https://<your-domain>/<name>/stream.m3u8 -t 4 -f null -` → `non-existing PPS 0 referenced` means it's not this add-on's output (are you pointing at go2rtc/HA HLS?). Confirm the Lambda override URL points at the add-on. |
 | **Live is black; ffprobe says `hevc`** | Camera is **H.265** in `copy` mode | Set that camera to `mode: transcode` in the add-on (or set the camera's sub stream to H.264B and use `copy`). |
 | **Your browser gets 403 on the public URL** | The lockdown rule working as intended | Expected — the camera host is locked to Amazon's ASNs. Test the stream from the **LAN** (`http://<ha-host>:8888/…`), not the public URL. |
