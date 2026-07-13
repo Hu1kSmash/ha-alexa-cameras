@@ -320,30 +320,141 @@ watch it (see the setup guide's WAF step).
 
 ## Logs
 
-Every request to `:8888` is logged with the **client IP**. This is the quickest way to
-tell where a "black Echo Show" problem is:
+The Logs tab is the add-on's black box: every camera worker announces how it started, and every
+request to `:8888` is logged with the **client IP**. The quickest "black Echo Show" triage is to
+open **Logs**, say **"Alexa, show camera &lt;name&gt;"**, and watch which IP the
+`GET /<name>/stream.m3u8` requests come from — walked through under *What a camera being viewed looks
+like* below. The manufactured examples that follow match the **Example configuration** from earlier
+so you can compare them against your own output line-for-line.
 
-1. Open the **Logs** tab.
-2. Say **"Alexa, show camera &lt;name&gt;"** on an Echo Show.
-3. Watch for `GET /<name>/stream.m3u8` and `.ts` requests:
-   - **From a `172.x` address** → that's Amazon's relay coming in via your Cloudflare
-     tunnel — **the stream IS reaching the add-on.** If the Echo is still black, the
-     problem is codec/decoding (see the black-screen row below), not connectivity.
-   - **Only your LAN IP** (your HA host's address), and **no `172.x` hits** when you ask
-     Alexa → the stream **isn't** getting to the add-on. The problem is upstream:
-     Cloudflare / the WAF rule / the tunnel / the Alexa skill Lambda.
+### What healthy startup looks like
 
-(Requests from your own browser — e.g. the *Served at* link — show your machine's LAN IP,
-which is how you tell them apart from Amazon's `172.x` relay traffic.)
+Right after the add-on starts (or after you save a config change), you'll see each camera worker
+come up. The examples below use the **Example configuration** from earlier — `driveway`/`porch`
+(direct, `transcode`), `sideyard`/`garage` (restream, `copy`), and a `birdseye` follow-cam
+(`on_demand`):
 
-The Logs tab below shows the camera workers starting up (each `Starting camera …` line = its source
-and `mode`), then request traffic with two client IPs to recognise: the **`127.0.0.1`** lines are
-the add-on validating its own streams, and the **`172.30.32.1`** lines are **Amazon's relay
-reaching the add-on** through your Cloudflare tunnel while an Echo shows a camera (seeing those
-`172.x` hits when you ask Alexa means connectivity is fine — a black screen then is a codec issue,
-not the tunnel):
+```text
+[init] timezone: America/Denver
+Starting camera 'driveway' (192.168.1.200, mode=transcode, audio=inject_mix)
+Starting camera 'porch' (192.168.1.201, mode=transcode, audio=inject_mix)
+Starting camera 'sideyard' (rtsp://ccab4aaf-frigate:8554/sideyard_sub, mode=copy, audio=inject_mix)
+Starting camera 'garage' (rtsp://ccab4aaf-frigate:8554/garage_sub, mode=copy, audio=inject_mix)
+Starting camera 'birdseye' (rtsp://ccab4aaf-frigate:8554/birdseye, mode=transcode, audio=inject, on-demand)
+Serving 5 camera(s): /<name>/stream.m3u8 and /<name>/snapshot.jpg on :8888
+Web UI listening on :8099 (ingress)
+[injector] feeding 'driveway' at /tmp/inject/driveway.pcm
+[injector] feeding 'porch' at /tmp/inject/porch.pcm
+[injector] feeding 'sideyard' at /tmp/inject/sideyard.pcm
+[injector] feeding 'garage' at /tmp/inject/garage.pcm
+[injector] feeding 'birdseye' at /tmp/inject/birdseye.pcm
+[injector] control on :8790  cams=['driveway', 'porch', 'sideyard', 'garage', 'birdseye']
+[init] stall watchdog started (60s threshold)
+[08:14:02] birdseye (on-demand) idle — not connecting until requested
+```
 
-![The Logs tab — camera workers starting, then internal 127.0.0.1 validation traffic and Amazon's 172.x relay traffic](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs.png)
+Each `Starting camera …` line echoes back **exactly** how that camera is configured — its source
+(`host` or `url`), its `mode`, and its `audio_source` — so it's the fastest way to confirm the
+add-on read your config the way you intended. **A healthy always-on worker then goes quiet:** it
+only logs again if it *fails* (ffmpeg logs at `error` level). No news is good news. The last line is
+the new `on_demand` behaviour — `birdseye` isn't being watched, so the add-on isn't connected to it
+at all (see below).
+
+### What a camera being viewed looks like (the black-Echo triage)
+
+Every request to `:8888` is logged with the client IP. Ask **"Alexa, show camera driveway"** and
+watch which IP shows up:
+
+```text
+172.30.32.1 - - [13/Jul/2026 08:20:11] "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
+172.30.32.1 - - [13/Jul/2026 08:20:11] "GET /driveway/seg_00047.ts HTTP/1.1" 200 -
+172.30.32.1 - - [13/Jul/2026 08:20:12] "GET /driveway/seg_00048.ts HTTP/1.1" 200 -
+172.30.32.1 - - [13/Jul/2026 08:20:12] "GET /driveway/snapshot.jpg HTTP/1.1" 200 -
+172.30.32.1 - - [13/Jul/2026 08:20:13] "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
+```
+
+- **`172.30.32.1` (or any `172.x`)** = **Amazon's relay reaching the add-on** through your Cloudflare
+  tunnel. **Seeing these when you ask Alexa means connectivity is fine** — the stream *is* getting
+  to the Echo. If the Echo is still black at this point, it's a **codec** problem, not the
+  tunnel (see the black-screen row in Troubleshooting — usually a High-profile source on `mode: copy`
+  that needs `transcode`).
+- **Only your own LAN IP, and no `172.x` at all** when you ask Alexa = the request never reached the
+  add-on. The problem is **upstream**: the Cloudflare tunnel, a WAF rule, or the Alexa skill / Lambda.
+- **`127.0.0.1`** lines are the add-on checking **its own** streams (the *Validate streams* tab and
+  the *Served at* link) — internal, not Amazon.
+
+### What an on-demand (birdseye) camera looks like
+
+An `on_demand` camera makes **no source connection while nothing's watching**, so its normal state is
+one quiet "idle" line. When something actually requests it, it starts; ~45 s after the last request,
+it stops again:
+
+```text
+[08:14:02] birdseye (on-demand) idle — not connecting until requested
+[08:31:40] birdseye (on-demand) requested — starting stream
+172.30.32.1 - - [13/Jul/2026 08:31:41] "GET /birdseye/stream.m3u8 HTTP/1.1" 404 -
+172.30.32.1 - - [13/Jul/2026 08:32:10] "GET /birdseye/stream.m3u8 HTTP/1.1" 200 -
+172.30.32.1 - - [13/Jul/2026 08:32:10] "GET /birdseye/seg_00001.ts HTTP/1.1" 200 -
+[08:33:35] birdseye (on-demand) unrequested 45s — stopping
+[08:33:40] birdseye (on-demand) idle — not connecting until requested
+```
+
+That early **`404`** is normal: the viewer asked before the first segment was ready. A source like
+Frigate birdseye takes **~30 s to spin its encoder up** on a cold view (see the *Validate streams*
+birdseye note), so the first "Alexa, show birdseye" after it's been idle may time out and a second
+try succeeds. Once warm it serves `200`s until you look away.
+
+### Troubleshooting by log signature
+
+ffmpeg errors are prefixed with the camera name (`[porch] …`), so you can tell **which** camera is
+failing and **why**. The most common signatures:
+
+**Wrong password / special character not encoded** — the camera rejects the login:
+
+```text
+[porch] [rtsp @ 0x7f2a1c0] method DESCRIBE failed: 401 Unauthorized
+[porch] [in#0 @ 0x7f2a0e0] Error opening input: Server returned 401 Unauthorized
+[08:24:09] porch stream exited after 1s; restarting in 6s
+```
+
+→ Fix the **Password** (and percent-encode any `@ : / ? # %` — see the Password field above).
+
+**Wrong RTSP path** — the camera answers but there's nothing at that path:
+
+```text
+[porch] [rtsp @ 0x561f3a0] method DESCRIBE failed: 404 Not Found
+[porch] [in#0 @ 0x561f2c0] Error opening input: Server returned 404 Not Found
+[08:24:31] porch stream exited after 1s; restarting in 12s
+```
+
+→ Fix the **Path** for this camera's brand (see *Finding your camera's RTSP path*).
+
+**Wrong IP or port, or the camera is offline** — nothing answers at all:
+
+```text
+[porch] [tcp @ 0x55a9d20] Connection to tcp://192.168.1.201:554 failed: Connection refused
+[porch] [in#0 @ 0x55a9c40] Error opening input: Connection refused
+[08:25:02] porch stream exited after 0s; restarting in 24s
+```
+
+→ Check the **Host** / **Port**, and that the camera is reachable from Home Assistant. Notice the
+restart delay **backs off** (6 s → 12 s → 24 s …): a camera failing on bad credentials is retried
+*slower* on purpose, because some cameras lock out an IP after repeated failed logins.
+
+**A stream that connects but then freezes** — the stall watchdog steps in:
+
+```text
+[08:40:07] [watchdog] garage frozen 60s+ -> restarting its ffmpeg only (attempt 1/3)
+```
+
+→ Usually the source hiccuped; the add-on restarts **only that camera** (never the others). If a
+camera can't recover after 3 tries it logs a one-time "giving up" line and leaves it alone rather
+than restart-looping forever — that's your cue to check that specific camera/source.
+
+**Black Echo, but the snapshot works, and the Logs show `172.x` GETs returning `200` with no
+ffmpeg errors** — this one has **no error line at all**; the tell is that everything *looks* healthy.
+The Echo is receiving video it can't decode. → Set that camera's **Mode** to **`transcode`** (the
+source is H.265 or H.264 High; the Echo needs H.264 Baseline).
 
 ---
 
