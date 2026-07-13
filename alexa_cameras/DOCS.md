@@ -258,6 +258,24 @@ switch to `copy` and save CPU — while **frontporch** and **officesideyard** on
 
 ![Validate streams — one transcode camera flagged that it could switch to copy, and two ideal copy cameras (source and output both OK)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
 
+**How the Source result is decided.** A stream is "Alexa-ready" only if it's **H.264** with a
+**Baseline / Constrained Baseline / Main** profile. Anything else — **H.265/HEVC**, **H.264 High**,
+or any other codec — is not decodable by the Echo. The tab compares that against the camera's `mode`:
+
+| Source | `mode` | Result | What it means |
+|---|---|---|---|
+| H.265, H.264 **High**, or other non-decodable | `copy` | 🔴 **ERROR** | *"Source is NOT Alexa-decodable in copy mode. Set mode: transcode (or set the camera's sub stream to H.264 Baseline)."* On `copy` the add-on only remuxes, so the Echo would get a codec it can't play — **a black screen.** This is the case you asked about: **yes, it's flagged red, up front.** |
+| H.265, H.264 **High**, or other non-decodable | `transcode` | 🟢 **OK** | *"Source needs transcoding; mode: transcode converts it to H.264 Baseline. Good."* |
+| H.264 Baseline/Main | `copy` | 🟢 **OK** | *"Source is H.264 Baseline/Main and mode: copy — ideal."* (lowest CPU) |
+| H.264 Baseline/Main | `transcode` | 🟡 **WARN** | *"Source is already Alexa-ready H.264 — you could switch to mode: copy to save CPU."* |
+
+The **Source** label also shows exactly what ffprobe found (e.g. `hevc Main 1920x1080 @15fps`), so you
+can see *why* it was flagged. The **Output** check is a second safety net — if what the add-on is
+actually serving on `:8888` isn't H.264 Baseline/Main it warns *"OUTPUT is not H.264 Baseline/Main —
+Alexa may show black"* — but on a bad `copy` the Source check red-errors first. The one exception is an
+**on-demand** source that's idle at probe time: it can't judge a stream that isn't flowing, so it reads
+**Idle** instead of an error (see the birdseye note below).
+
 > ⚠️ **Heads-up about Frigate birdseye — it's an *on-demand, re-encoded* stream, so run it gently.**
 >
 > Birdseye has **two layers**, and it only makes sense once you see both:
