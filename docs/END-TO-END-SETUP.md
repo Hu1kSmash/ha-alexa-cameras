@@ -174,7 +174,7 @@ entry that routes your camera subdomain to the Alexa Cameras add-on:
 ```yaml
 additional_hosts:
   - hostname: cam                        # your <your-domain> subdomain (e.g. cam.example.com)
-    service: http://<ha-host-ip>:8888    # your HA server's LAN IP, e.g. http://192.168.1.100:8888
+    service: http://<ha-host>:8888       # your HA server's LAN IP, e.g. http://192.168.1.100:8888
 ```
 
 > ⚠️ Use your **Home Assistant server's LAN IP** for the `:8888` target — the add-on
@@ -536,7 +536,7 @@ alexa:
         # ...plus light/switch/lock/etc. for anything else you want on Alexa...
       exclude_entities:
         # Exclude camera.birdseye ONLY if you are NOT doing the birdseye follow-cam
-        # (see README "Bonus"). If you ARE, INCLUDE it and name it below — the add-on
+        # (see the add-on's DOCS.md). If you ARE, INCLUDE it and name it below — the add-on
         # transcodes birdseye's H.264 High stream to Alexa Baseline, so it IS playable.
         # - camera.birdseye
         # ...any duplicate H.265 cameras that can't be Alexa-played...
@@ -580,7 +580,7 @@ Naming gotchas learned the hard way:
 
 1. **Discover:** *"Alexa, discover devices"* (or Alexa app → Devices → **+**).
    Your cameras appear with the `entity_config` names.
-2. **Show:** *"Alexa, show camera front porch"* on an Echo Show. Expect a live view
+2. **Show:** *"Alexa, show camera porch"* on an Echo Show. Expect a live view
    within ~2–4 seconds.
 3. If a snapshot appears but the live view is black, work through
    [Troubleshooting](#7-troubleshooting) — it's almost always codec, cert, or WAF.
@@ -605,7 +605,7 @@ Work top-down; each check isolates one link in the chain.
 | **Your browser gets 403 on the public URL** | The lockdown rule working as intended | Expected — the camera host is locked to Amazon's ASNs. Test the stream from the **LAN** (`http://<ha-host>:8888/…`), not the public URL. |
 | **`camera not responding`, all cameras, right after setup** | Lambda not returning the override, or `CAMERA_MAP`/`CAMERA_BASE_URL` wrong | Lambda **CloudWatch** logs (set `DEBUG=True`); confirm the `endpointId` suffix matches a `CAMERA_MAP` key and the built URL resolves. |
 | **One camera 401s / add-on log shows an auth loop** | Wrong `rtsp_password` (watch `$` and other shell/URL-special chars) | Fix the password in the add-on config; the add-on backs off automatically so it won't lock the camera out. |
-| **Stale/duplicate cameras in Alexa after changes** | Alexa keeps old devices | Bulk-delete + re-discover — see [README → Bonus tool: bulk-clean stale Alexa devices](../README.md#bonus-tool-bulk-clean-stale-alexa-devices). |
+| **Stale/duplicate cameras in Alexa after changes** | Alexa keeps old devices | Bulk-delete + re-discover — see [DOCS → Bonus tool: bulk-clean stale Alexa devices](../alexa_cameras/DOCS.md#bonus-tool-bulk-clean-stale-alexa-devices). |
 
 **Useful commands:**
 
