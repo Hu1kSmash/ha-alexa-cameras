@@ -135,11 +135,15 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 
 ## Example configuration
 
-A complete config with **every** field, showing how they fit together — RTSP defaults, the
-optional audio-injection keys, and three cameras: a plain `copy` camera, a `transcode` camera
-with a per-camera `path` that mixes announcements into its own audio, and a `url`-override
-birdseye whose (silent) audio is replaced with announcements. The **View as YAML** toggle in the
-Configuration tab shows yours in exactly this form.
+There are two ways to point the add-on at your cameras. The stream Alexa receives is **identical**
+either way — the only difference is *where* the add-on pulls the video from, and you can mix per
+camera. The **View as YAML** toggle in the Configuration tab shows your live config in this form.
+
+### Option A — direct from each camera (default)
+
+The add-on connects **straight to each camera's RTSP**. Simplest, and **self-contained**: nothing
+else has to be running for these to serve, so a camera stays available on Alexa even if your
+NVR / Frigate is down.
 
 ```yaml
 lan_ip: 192.168.1.100                                # Home Assistant server's LAN IP (required)
@@ -153,23 +157,57 @@ default_path: "/cam/realmonitor?channel=1&subtype=1" # Amcrest/Dahua SUB stream
 # Audio injection (optional) — announce THROUGH a camera; see "Audio injection" below
 inject_token: "a-long-random-secret"                 # protects the :8790 control API
 tts_engine: "tts.google_en_com"                      # default HA voice for {"text": ...}
-# ha_base: "http://homeassistant:8123"               # advanced; the default is fine
 
 cameras:
   - name: frontporch                                 # -> /frontporch/stream.m3u8
-    host: 192.168.1.201                              # this camera's IP
+    host: 192.168.1.201                              # this camera's IP (direct)
     mode: copy                                        # already H.264 -> remux only, ~0% CPU
   - name: garagedoors
     host: 192.168.1.206
     path: "/cam/realmonitor?channel=1&subtype=0"     # this one only has a main stream
     mode: transcode
     audio_source: inject_mix                          # keep its audio + overlay announcements
-  - name: birdseye                                    # Frigate follow-cam (H.264 High)
-    url: "rtsp://ccab4aaf-frigate:8554/birdseye"      # hostname = the standard Frigate add-on
-    mode: transcode
-    audio_source: inject                              # birdseye is silent -> replace with TTS
-    on_demand: true                                   # idle/404 when Frigate isn't tracking -> quiet it
 ```
+
+### Option B — via a go2rtc / Frigate restream (recommended if you already run one)
+
+If you already run **Frigate** (or any go2rtc / RTSP restreamer), point the add-on at the
+**restream** instead of the camera. The camera then serves **one** stream to go2rtc, which fans it
+out to Frigate's detect/record **and** this add-on — so the add-on puts **no extra load on the
+camera at all**. That matters most for **wireless / battery doorbell cameras** (limited connections,
+flaky links): keep the bandwidth off them and they stream better.
+
+A restream is **pass-through** — it delivers the source stream *exactly as the camera is
+configured*. So if the source sub stream is already H.264 Baseline/Main (as it should be for
+Alexa), you use **`copy`** here too — no extra transcode, near-zero CPU. (If the restream carries
+H.265 / H.264 High, use `transcode`, same as direct.)
+
+Give each camera a **`url`** pointing at its restream; `host` and the `rtsp_*` defaults aren't
+needed for those cameras:
+
+```yaml
+lan_ip: 192.168.1.100
+
+cameras:
+  - name: frontporch
+    url: "rtsp://ccab4aaf-frigate:8554/frontporch_sub"   # go2rtc low-res (sub) restream
+    mode: copy                                            # pass-through H.264 -> copy works
+  - name: garagedoors
+    url: "rtsp://ccab4aaf-frigate:8554/garagedoors_sub"
+    mode: copy
+```
+
+> **Stream names & host:** `ccab4aaf-frigate` is the standard Frigate add-on's internal hostname and
+> `:8554` is go2rtc's RTSP port. Your exact stream names come from your go2rtc config — for Frigate
+> they're typically `<camera>` (main) and `<camera>_sub` (low-res); browse them at
+> `http://<frigate-host>:1984`. **Prefer the `_sub` (low-res) stream** for Alexa.
+
+> **Trade-off:** a camera pulled through a restream now depends on that restreamer (Frigate/go2rtc)
+> being up — if it goes down, that Alexa feed goes down with it. Keep any camera you want to stay
+> independent on **Option A** (direct).
+
+*(A restream-only follow-cam like Frigate **birdseye** is configured here too, as a `url` camera —
+see the **Audio injection** section for its `on_demand` specifics.)*
 
 ---
 
