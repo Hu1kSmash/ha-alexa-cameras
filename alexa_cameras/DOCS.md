@@ -249,12 +249,12 @@ on the add-on's own output. Per camera it reports:
 - **Output** — confirms the add-on's `:8888` HLS is live and decodable H.264 Baseline (what Alexa
   actually opens).
 
-Green means good; anything wrong is called out in plain English. Here it flags a `transcode`
-camera whose source is *already* H.264 Baseline, so it could switch to `copy` and save CPU:
+Green means good; anything off is flagged in plain English. Below, **frontdriveway** on
+`transcode` gets a **WARN** — its source is *already* Alexa-ready H.264 Baseline, so it could
+switch to `copy` and save CPU — while **frontporch** and **officesideyard** on `copy` read **OK**
+(source is H.264 Baseline *and* the output is live, decodable H.264):
 
-![Validate streams — source already H.264 Baseline, could use copy](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-h246.png)
-
-![Validate streams — healthy cameras](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
+![Validate streams — one transcode camera flagged that it could switch to copy, and two ideal copy cameras (source and output both OK)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
 
 > ⚠️ **Heads-up about Frigate birdseye — expect idle errors, and they're harmless.**
 >
