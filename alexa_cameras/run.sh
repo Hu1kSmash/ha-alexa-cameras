@@ -151,7 +151,7 @@ hls_loop() {
   # For those: filter the predictable "source down" noise out of the log, announce the wait
   # just once, and retry on a calm fixed interval instead of spamming an error every ~30s.
   local NOISE='method DESCRIBE failed|Error opening input|Server returned 404|404 Not Found|Connection refused|Connection timed out|Immediate exit requested'
-  local delay=3 start ran waiting=0
+  local delay=3 start ran waiting=0 mtime
   local -a filt=(cat)
   [ "$on_demand" = "1" ] && filt=(grep -vE "$NOISE")
   while true; do
@@ -168,14 +168,16 @@ hls_loop() {
     if [ "$on_demand" = "1" ]; then
       # HANDS-OFF. An on-demand source (Frigate birdseye) may be idle/absent for long stretches,
       # and repeatedly reconnecting *hammers the upstream* — with birdseye that churns go2rtc's
-      # QSV encoder until it wedges Frigate. So we do NOT try to keep it warm: announce the wait
-      # once, then back off exponentially (30s -> 5 min) so we barely poke it. The 30s floor is
-      # deliberately >= birdseye's ~29s cold-resume, so a retry can't self-interrupt the previous
-      # one. A healthy run (>=30s actually serving) resets the backoff and re-arms the notice.
-      if [ "$ran" -ge 30 ]; then
+      # QSV encoder until it wedges Frigate. So we do NOT try to keep it warm: back off
+      # exponentially (30s -> 5 min) so we barely poke it. Decide "did this attempt SERVE?" by
+      # fresh OUTPUT (a playlist written in the last ~10s), NOT by run duration: a *failed* connect
+      # to a slow source (birdseye's ~30s QSV spin-up, which go2rtc then kills) also lasts ~30s, so
+      # a duration test would misread the failure as a success, reset the backoff, and churn.
+      mtime=$(stat -c %Y "$HLS/$cam/stream.m3u8" 2>/dev/null || echo 0)
+      if [ "$(( $(date +%s) - mtime ))" -lt 10 ]; then
         delay=30; waiting=0
       elif [ "$waiting" = "0" ]; then
-        echo "[$(date +%H:%M:%S)] $cam (on-demand) source idle / not producing — waiting quietly; backing off to gentle retries (up to 5 min)"
+        echo "[$(date +%H:%M:%S)] $cam (on-demand) source not producing — waiting quietly; backing off to gentle retries (up to 5 min)"
         waiting=1; delay=30
       else
         delay=$(( delay * 2 )); [ "$delay" -gt 300 ] && delay=300

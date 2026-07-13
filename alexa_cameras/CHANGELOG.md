@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.9
+
+- **Fix: `on_demand` backoff now actually backs off.** 1.9.8 decided whether an attempt had *served*
+  by its run duration (`>= 30s` = served → reset the retry). But a *failed* connect to a slow
+  on-demand source — Frigate **birdseye**, whose `h264_qsv` restream encoder takes ~30 s to spin up
+  and is then killed by go2rtc's exec-timeout — also lasts ~30 s, so failures were misread as
+  successes: the backoff reset every 30 s and **kept hammering birdseye until it wedged Frigate**.
+  The add-on now judges "served" by **actual output** (a playlist segment written in the last ~10 s),
+  so a failed attempt correctly backs off (30 s → 5 min) while a real serve resets and holds the
+  connection. Makes an on-demand source (birdseye) *safe* — it can't churn the upstream — even if it
+  can't always be pulled reliably.
+
 ## 1.9.8
 
 - **`on_demand` cameras are now genuinely hands-off** — a gentle exponential backoff (**30s → 5
