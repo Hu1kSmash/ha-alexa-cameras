@@ -599,20 +599,20 @@ both places if you rotate it, or keep it in `secrets.yaml` and reference `{{ …
 # test beep
 action: rest_command.cam_beep
 data:
-  cam: garagedoors
+  cam: driveway
 ```
 ```yaml
 # speak text
 action: rest_command.cam_say
 data:
-  cam: garagedoors
+  cam: driveway
   message: "A vehicle is approaching the house"
 ```
 ```yaml
 # play an audio URL
 action: rest_command.cam_url
 data:
-  cam: garagedoors
+  cam: driveway
   url: "http://…/clip.mp3"
 ```
 
