@@ -329,15 +329,14 @@ tell where a "black Echo Show" problem is:
 (Requests from your own browser — e.g. the *Served at* link — show your machine's LAN IP,
 which is how you tell them apart from Amazon's `172.x` relay traffic.)
 
-The Logs tab — the camera workers starting up (each `Starting camera …` line shows the source and
-`mode`), then internal validation traffic from `127.0.0.1`:
+The Logs tab below shows the camera workers starting up (each `Starting camera …` line = its source
+and `mode`), then request traffic with two client IPs to recognise: the **`127.0.0.1`** lines are
+the add-on validating its own streams, and the **`172.30.32.1`** lines are **Amazon's relay
+reaching the add-on** through your Cloudflare tunnel while an Echo shows a camera (seeing those
+`172.x` hits when you ask Alexa means connectivity is fine — a black screen then is a codec issue,
+not the tunnel):
 
-![The Logs tab — camera workers starting, then internal 127.0.0.1 validation traffic](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs.png)
-
-…and Amazon's relay reaching the add-on while an Echo shows a camera — every request from
-a `172.x` address (`172.30.32.1`, via the tunnel):
-
-![The Logs tab — Amazon's relay reaching the add-on](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs-alexa.png)
+![The Logs tab — camera workers starting, then internal 127.0.0.1 validation traffic and Amazon's 172.x relay traffic](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs.png)
 
 ---
 
