@@ -59,7 +59,7 @@ item in the Home Assistant sidebar, then go to the **Configuration** tab.
 The Configuration tab has a **form** with a **View as YAML** toggle — use whichever you
 prefer; they edit the same file.
 
-![The Configuration tab — set the Home Assistant IP (a private IPv4, not a hostname) and add your cameras. Each camera row has an Audio column (none / inject / inject_mix), and the Audio injection panel below the table holds the control-API token and default TTS engine](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/config-tab.png)
+![The Configuration tab — set the Home Assistant IP (a private IPv4, not a hostname) and add your cameras. Each camera row takes a Host (direct) or a URL override (e.g. a go2rtc/Frigate restream — Host greys out when a URL is set), plus Mode, an Audio column (none / inject / inject_mix), and an On-demand checkbox; the Audio injection panel below the table holds the control-API token and default TTS engine](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/config-tab.png)
 
 ---
 
