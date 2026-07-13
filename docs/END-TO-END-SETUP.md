@@ -207,11 +207,20 @@ route:
 > `additional_hosts` may be ignored. Make sure the route you actually rely on is the
 > one pointing at `:8888`.
 
-Verify from anywhere:
+Now confirm the public HTTPS URL actually reaches the add-on. From **any** machine, replace
+`<your-domain>` with your camera domain and `<name>` with one of your cameras, then run:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://<your-domain>/<name>/stream.m3u8
 ```
+
+That fetches the stream's playlist over HTTPS and prints just the HTTP response code. **You
+want `200`** — it means the tunnel and its TLS certificate are working end to end. (`404` =
+tunnel is up but the route/path is wrong; a connection error or `5xx` = the tunnel isn't
+pointing at `:8888` yet.) The stream is wide open to the world at this point — that's expected;
+you lock it down to Amazon in [Step 3](#step-3--cloudflare-waf-lock-the-camera-host-to-amazon-only),
+after which this **same** command from your own machine returns **`403`**. So run this `200`
+check now, *before* locking it down.
 
 > If you also expose Home Assistant itself through Cloudflare, keep that on its own
 > hostname (e.g. `ha.example.com`). The add-on hostname (`<your-domain>`) only
