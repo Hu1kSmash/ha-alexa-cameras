@@ -114,12 +114,6 @@ and skill are set up. **Get every camera green before you proceed.**
 
 ![The add-on's Validate streams tab — each camera's Source and Output confirmed as live, decodable H.264](images/validate-streams.png)
 
-Two more tabs matter later: once the tunnel + Lambda are up, **Public URL check** tests
-the external URL (a **403** there = reachable + WAF-locked, which is what you want), and
-during the test the **Logs** tab shows a `GET /<name>/stream.m3u8` from a **`172.x`**
-address the moment Amazon's relay reaches the add-on — the fastest way to tell "black
-Echo" apart from "not reaching the add-on".
-
 **Optional — verify from the command line** (e.g. from another machine) instead of the
 Validate streams tab:
 
@@ -133,6 +127,17 @@ ffprobe -v error -i http://<ha-host>:8888/<name>/stream.m3u8 \
 ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 4 -f null -
 # expect: NO output (no "non-existing PPS 0 referenced")
 ```
+
+Two more Web UI tabs come into play once the external pieces are up — nothing to do with
+them yet, just know where to look. The **Public URL check** tab confirms the tunnel and WAF
+from Home Assistant's side: a green **`403`** per camera is the goal — the stream is
+reachable *and* locked to Amazon (exactly what the
+[WAF rule](#3-cloudflare-waf--lock-the-camera-host-to-amazon-only) does). And during the
+final test, the **Logs** tab shows a `GET /<name>/stream.m3u8` from a **`172.x`** address the
+instant Amazon's relay reaches the add-on — the fastest way to tell a "black Echo" (a codec
+problem) apart from "the stream never arrived" (tunnel / WAF).
+
+![The Public URL check tab — a green 403 per camera means reachable and locked to Amazon](images/public-url-check.png)
 
 ---
 
