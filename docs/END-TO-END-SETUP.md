@@ -128,10 +128,9 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 4 -f null -
 # expect: NO output (no "non-existing PPS 0 referenced")
 ```
 
-Two more Web UI tabs come into play once the external pieces are up — nothing to do with
-them yet, just know where to look. The **Public URL check** tab confirms the tunnel and WAF
-from Home Assistant's side: a green **`403`** per camera is the goal — the stream is
-reachable *and* locked to Amazon (exactly what the
+**Verify the Public URL** once your tunnel and Lambda are up: the **Public URL check** tab
+confirms them from Home Assistant's side — a green **`403`** per camera is the goal, meaning
+the stream is reachable *and* locked to Amazon (exactly what the
 [WAF rule](#3-cloudflare-waf--lock-the-camera-host-to-amazon-only) does). And during the
 final test, the **Logs** tab shows a `GET /<name>/stream.m3u8` from a **`172.x`** address the
 instant Amazon's relay reaches the add-on — the fastest way to tell a "black Echo" (a codec
