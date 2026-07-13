@@ -51,18 +51,18 @@ self-hosted Alexa Smart Home skill** (see [Prerequisites](#prerequisites)).
  Camera (RTSP)
     │  H.264 or H.265
     ▼
- [1] Alexa Cameras (HLS) add-on            http://<ha-host>:8888/<name>/stream.m3u8
+ Step 1 Alexa Cameras (HLS) add-on         http://<ha-host>:8888/<name>/stream.m3u8
     │  H.264 Baseline MPEG-TS HLS
     ▼
- [2] Cloudflare Tunnel                      https://<your-domain>/<name>/stream.m3u8
+ Step 2 Cloudflare Tunnel                  https://<your-domain>/<name>/stream.m3u8
     │  valid TLS cert on 443
-    │  [3] Cloudflare WAF: lock cam host to AWS ASN 16509 / 14618 only
+    │  Step 3 Cloudflare WAF: lock cam host to AWS ASN 16509 / 14618 only
     ▼
- [4] AWS Lambda  =  your self-hosted Alexa Smart Home skill
+ Step 4 AWS Lambda  =  your self-hosted Alexa Smart Home skill
     │   • normal directives  → proxied to HA  https://<HA_URL>/api/alexa/smart_home
     │   • InitializeCameraStreams → returns the add-on's HLS URL (override)
     ▼
- [5] Home Assistant  (alexa: smart_home, exposes camera entities + names)
+ Step 5 Home Assistant  (alexa: smart_home, exposes camera entities + names)
     ▼
  Alexa cloud relay (ACRS)  →  Echo Show
 ```
@@ -586,11 +586,6 @@ Naming gotchas learned the hard way:
 3. If a snapshot appears but the live view is black, work through
    [Troubleshooting](#troubleshooting) — it's almost always codec, cert, or WAF.
 
-The add-on's **Public URL check** tab confirms the tunnel + WAF from Home Assistant's
-side — a green **`403`** per camera is the ideal result (reachable, and locked to Amazon):
-
-![Public URL check — 403 means reachable and locked to Amazon](images/public-url-check.png)
-
 ---
 
 ## Troubleshooting
@@ -634,4 +629,4 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 5 -f null -
   to **H.264B** and use `mode: copy`.
 - For a single "follow the action" camera, point the add-on's per-camera `url` at a
   Frigate **birdseye** restream (`rtsp://<frigate>:8554/birdseye`, `mode: transcode`
-  since birdseye is H.264 High) — see [`alexa_cameras/DOCS.md`](../alexa_cameras/DOCS.md).
+  since birdseye is H.264 High) — see the [Documentation](../alexa_cameras/DOCS.md).
