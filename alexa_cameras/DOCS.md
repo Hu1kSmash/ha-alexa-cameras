@@ -118,7 +118,7 @@ full `url`.
 | **Path** (`path`) | No | Overrides the **Default RTSP path** for this **one** camera only. Use it when most of your cameras share a path but one is different — for example, a camera that only exposes its high-res **main** stream (`/cam/realmonitor?channel=1&subtype=0`). Leave it blank to use the Default RTSP path above. Ignored when the camera uses a full **URL**. |
 | **Mode** (`mode`) | **Yes** | How the add-on prepares this camera's video for Alexa — the single most important per-camera choice, since it decides whether the add-on uses ~0% CPU or a real chunk of a core:<br>• **`copy`** — the source is *already* H.264 (Baseline/Main), so ffmpeg only **remuxes** it into MPEG-TS. Near-zero CPU. **Use this whenever you can.**<br>• **`transcode`** — the source is **H.265/HEVC**, H.264 **High** profile, or otherwise not Alexa-decodable, so ffmpeg **re-encodes** it (scales to 1280×720, H.264 Baseline). ~0.3–0.5 of a core per camera — use only where `copy` won't work.<br>**Rule of thumb:** try **`copy`** first; if the Echo shows a **black screen** but the snapshot works, the source needs **`transcode`**.<br>**Tip (Amcrest/Dahua & most NVRs):** set the camera's **sub / second stream** to **H.264B** (Baseline), ~720p, low bitrate, then use `copy`. Reserve `transcode` for sources you can't reconfigure — like Frigate birdseye (H.264 **High**). |
 | **Audio** (`audio_source`) | No | Optional. Lets an Alexa announcement play **through this camera's sound** instead of interrupting the live view. Leave it blank for normal behaviour (the camera's own audio, if it has any).<br>• **`inject`** — replace the camera's audio with the announcement (good for silent cameras like Frigate birdseye).<br>• **`inject_mix`** — keep the camera's own audio and mix the announcement on top (needs a camera that actually has audio).<br>Only relevant if you use the **Audio injection** feature (below). |
-| **On-demand** (`on_demand`) | No | Tick this for a source that's **expected to be absent / `404` when nothing's using it** — most notably a Frigate **birdseye** (`mode: objects`) feed, which only exists while Frigate is tracking activity. When set, the add-on treats that camera's idle state as *normal* instead of an error: it **quiets the repeated `404` / connection errors** in the Logs (announcing the wait just once), **excludes the camera from the stall watchdog** (no restart-loop or "giving up" warning), retries on a **calm fixed interval**, and shows it as **Idle** (not red/amber) in Validate streams. Leave it off for normal always-on cameras, where those errors *are* real problems. See the **Frigate birdseye** notes under *Validate streams*. |
+| **On-demand** (`on_demand`) | No | Tick this for a source that's **expected to be idle / absent / `404` when nothing's consuming it** — most notably a Frigate **birdseye** feed, whose go2rtc encoder pauses when idle (see the **Frigate birdseye** notes under *Validate streams*). When set, the add-on treats that camera's idle state as *normal* and, importantly, **stops hammering it**: it **backs off with a gentle exponential retry (30 s → 5 min)** instead of reconnecting aggressively — which is what prevents the add-on from churning and *wedging* a fragile on-demand encoder. It also **quiets the repeated `404` / connection errors** in the Logs (announcing the wait once), **excludes the camera from the stall watchdog**, and shows it as **Idle** (not red/amber) in Validate streams. Leave it off for normal always-on cameras, where those errors *are* real problems. |
 
 ### Audio injection
 
@@ -258,37 +258,38 @@ switch to `copy` and save CPU — while **frontporch** and **officesideyard** on
 
 ![Validate streams — one transcode camera flagged that it could switch to copy, and two ideal copy cameras (source and output both OK)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams.png)
 
-> ⚠️ **Heads-up about Frigate birdseye — expect idle errors, and they're harmless.**
+> ⚠️ **Heads-up about Frigate birdseye — it's an *on-demand, re-encoded* stream, so run it gently.**
 >
-> Birdseye (`mode: objects`) is a **follow-cam with nothing to follow when idle.** When Frigate
-> isn't tracking any activity, its birdseye restream goes **fully cold — the RTSP endpoint returns
-> `404 Not Found`.** So the add-on's worker logs a burst of `method DESCRIBE failed: 404` /
-> `Error opening input file rtsp://…/birdseye`, retries every few seconds, and
-> `/<birdseye>/stream.m3u8` 404s too — which also shows as a red **Source** / amber **Output** here
-> in Validate streams.
+> Birdseye has **two layers**, and it only makes sense once you see both:
+> - **Frigate's birdseye producer** runs continuously (`restream: true` + `idle_heartbeat_fps`) —
+>   when nothing's being tracked it just shows the Frigate **logo** (a camera leaves birdseye
+>   `inactivity_threshold` seconds after its last activity, so idle birdseye = the logo, *not* black).
+> - **go2rtc re-encodes** that to H.264 for its RTSP restream, using a **hardware (`h264_qsv`)
+>   encoder that runs *on demand*** — it **pauses when nothing is consuming the stream**, and takes
+>   **~30 s to spin back up** on the next connection.
 >
-> **Important — this is the part people get wrong:** while birdseye is cold, **trying to view it
-> does *not* start it.** *"Alexa, show birdseye"* (or opening the stream in a browser / Validate)
-> just fails until **Frigate itself brings birdseye up — which only happens when it detects
-> activity and starts tracking.** The stream isn't being produced yet; there is nothing the add-on
-> can do to conjure it.
+> So a *fresh* **"Alexa, show birdseye"** after it's been idle often **times out** while that encoder
+> spins up, and a **second** attempt succeeds (you'll see the logo, or the active camera). Opening it
+> in a browser or in Validate does the same. That ~30 s cold-start is normal for an on-demand encoder
+> — viewing it *does* wake it, it's just not instant.
 >
-> **This is normal and expected — it's how Frigate's birdseye works, not a fault in this add-on or
-> your configuration.** And it doesn't break your setup: birdseye displays correctly whenever
-> there *is* activity — which is exactly when you'd want it up. So the **reliable** way to use it is
-> the **auto-show-on-detection** automation — push birdseye to the Echo *when Frigate detects
-> motion* (see the **birdseye** recipe below) — rather than an on-demand *"show birdseye."* Frigate's
-> `idle_heartbeat_fps` can keep it warmer and quicker to open *when it's already up*, but it won't
-> keep a follow-cam alive when there's nothing to follow.
+> **The part that actually matters — don't let the add-on hammer it.** Reconnecting to birdseye over
+> and over churns that hardware encoder, and under enough churn it can **wedge**: the `h264_qsv` exec
+> times out and it can cascade into Frigate's detect/record pipeline (detection and automations stop
+> firing). So for birdseye — or *any* source that's expected to be idle/absent — **tick On-demand**
+> (`on_demand: true`). The add-on then **backs off gently** (a 30 s → 5 min retry instead of hammering),
+> quiets that camera's logs, skips the stall watchdog, and validates it as **Idle** rather than
+> red/amber. That's the *"hands-off, don't try to keep it warm"* mode, and it's the right way to run
+> an on-demand source.
 >
-> **Quiet the noise:** tick the **On-demand** box for the birdseye camera (config key
-> `on_demand: true`). The add-on then treats its idle `404`s as normal — it collapses the repeated
-> errors into a single "waiting" line, skips the stall watchdog for it, and shows it as **Idle**
-> here instead of red/amber.
+> **Normal vs. broken:**
+> - **Idle `404` / Source-timeout / Output "not advancing" on birdseye** = normal (the encoder is
+>   paused). With **On-demand** ticked it reads **Idle** — safe to ignore.
+> - A **persistent `404` that stays down even while Frigate is clearly tracking activity** — *and* your
+>   detection / browser-mod popups / automations have gone dead too — is **not** normal idle. That's a
+>   **wedged Frigate encoder**; restart the **Frigate** add-on to clear it (see Troubleshooting below).
 >
-> Bottom line: for **birdseye specifically**, idle `404` / Source-timeout / watchdog-restart noise
-> is **safe to ignore** (and, with **On-demand** ticked, mostly silenced). On a *normal, always-on*
-> camera, red/amber here is a real problem worth chasing.
+> (On a *normal, always-on* camera — not on-demand — red/amber here is always a real problem worth chasing.)
 
 ![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
 
@@ -542,7 +543,8 @@ expose it to the internet, and protect it with `inject_token`.
 | Alexa black, **no `172.x`** in Logs when asked | Stream not reaching the add-on | Look upstream: Cloudflare / WAF / tunnel / Lambda (see the setup guide). |
 | Camera on Alexa **frozen** after an add-on restart/update | Alexa holds the last frame when the HLS stream restarts | Re-show it (*"Alexa, show &lt;camera&gt;"*). Any add-on restart interrupts a live view. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
-| **Frigate birdseye** logs `404` / errors when idle (`DESCRIBE failed: 404`, Source timeout, Output "not advancing", watchdog restarts) | **Normal.** With `mode: objects`, birdseye's restream goes cold (RTSP `404`) when Frigate isn't tracking anything — this is how birdseye works, nothing the add-on can change | **Safe to ignore for birdseye.** It comes up **only** when Frigate detects activity — *viewing a cold birdseye (even "Alexa, show birdseye") won't start it.* Use the auto-show-on-detection automation (see the birdseye recipe). |
+| **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then backs off gently and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
+| **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on doesn't hammer the encoder. |
 | Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
@@ -625,11 +627,14 @@ add-on's puller doesn't lose a live stream mid-idle), **and** it keeps that stre
 real-time so Alexa opens it promptly — set it too low and the idle timeline crawls (slower than
 real-time), adding several seconds to *"show birdseye"* while a normal camera opens instantly.
 
-> **It does not make birdseye available 24/7, though.** With `mode: objects` birdseye is a
-> follow-cam: when Frigate is tracking *nothing*, the restream still goes cold and returns `404`,
-> and **no viewer request will revive it — only Frigate detecting activity will** (see the birdseye
-> idle-errors note under *Validate streams* above). That's exactly why the **automation** below —
-> which shows birdseye *when Frigate detects motion* — is the reliable trigger, not an on-demand
+> **But `idle_heartbeat_fps` only keeps Frigate's *producer* fed — go2rtc still re-encodes birdseye
+> *on demand*.** That `h264_qsv` encoder pauses when nothing is consuming the restream and takes ~30 s
+> to spin back up, so the first *"show birdseye"* after it's been idle can time out (a retry works —
+> viewing *does* wake it, it's just not instant). **The thing to avoid is *hammering* it:**
+> reconnecting to birdseye aggressively can wedge that encoder and cascade into Frigate (detection
+> stops — see the birdseye note under *Validate streams* above). So serve birdseye through the add-on
+> with **`on_demand: true`** (gentle backoff, no hammering), and lean on the **auto-show-on-detection
+> automation** below to bring it up right when there's something to see — rather than a manual
 > *"show birdseye."*
 
 That makes `camera.birdseye` a fully valid Alexa camera — it displays correctly on an
