@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.8
+
+- **`on_demand` cameras are now genuinely hands-off** — a gentle exponential backoff (**30s → 5
+  min**) instead of the old fixed 15s retry. The 15s retry was *shorter* than the ~29s cold-resume
+  of an on-demand source like Frigate **birdseye**, so the add-on kept interrupting its own
+  reconnects — hammering go2rtc's QSV encoder until it wedged Frigate. The add-on no longer tries
+  to keep an on-demand source "warm": it announces the wait once, then backs off far and leaves the
+  source alone, resetting only after it actually serves for a while. Much gentler on the upstream.
+
 ## 1.9.7
 
 - **`on_demand` logging is now truly quiet.** An on-demand camera announces its idle wait
