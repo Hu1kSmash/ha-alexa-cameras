@@ -667,7 +667,7 @@ expose it to the internet, and protect it with `inject_token`.
   idle stream time-dilates, adding seconds to *"show birdseye"*) — is the *source's* job:
   set Frigate `birdseye.idle_heartbeat_fps: 10` (see the **birdseye** recipe below for why).
 - ffmpeg errors are surfaced into the Logs, each line prefixed with the camera name
-  (`[frontporch] ...`), so you can tell *which* camera is failing and *why*.
+  (`[porch] ...`), so you can tell *which* camera is failing and *why*.
 
 ---
 
@@ -685,11 +685,10 @@ expose it to the internet, and protect it with `inject_token`.
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
 | **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then leaves it alone while idle (connecting only when watched) and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
 | **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on only connects to it while it's being watched, never churning the encoder. |
-| Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
 | **Audio injection:** `POST /say` → **400 `no inject camera '<name>'`** | That camera's **Audio** is `none` (or the name is wrong) — nothing is injected, no stream is touched | Set the camera's **Audio** to `inject`/`inject_mix` and **Save & apply** (no add-on restart needed — the injector re-reads its cameras on save). The reply's `cams` list shows which cameras *are* inject-enabled; target one of those (or omit `cam` to use the first). |
-| **Audio injection:** `{text}` → **401 Unauthorized** | Add-on can't reach HA's TTS | Update to **≥ 1.9.0** (grants `homeassistant_api`) and set a valid `tts_engine`. |
+| **Audio injection:** `{text}` → **401 Unauthorized** | The add-on couldn't authenticate to Home Assistant to render the TTS (its call to HA's `tts_get_url` was rejected) | Confirm a valid `tts_engine` is set in the **Audio injection** panel. If it persists, restart the add-on to restore its Home Assistant API access — or use `{url}` mode instead, which plays audio you provide and makes no HA TTS call. |
 | **Audio injection:** `/say` → **500 "No such file"** | The audio URL isn't reachable from the add-on's container | Prefer `{text}` (the add-on fetches internally). With `{url}`, point at something the container can reach — not an HA *external* LAN-IP URL. |
 
 ---
