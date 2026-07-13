@@ -158,14 +158,14 @@ inject_token: "a-long-random-secret"                 # protects the :8790 contro
 tts_engine: "tts.google_en_com"                      # default HA voice for {"text": ...}
 
 cameras:
-  - name: frontporch                                 # -> /frontporch/stream.m3u8
-    host: 192.168.1.201                              # this camera's IP (direct)
-    mode: copy                                        # already H.264 -> remux only, ~0% CPU
-  - name: garagedoors
-    host: 192.168.1.206
-    path: "/cam/realmonitor?channel=1&subtype=0"     # this one only has a main stream
+  - name: driveway                                   # -> /driveway/stream.m3u8
+    host: 192.168.1.200                              # this camera's IP (direct)
+    mode: transcode                                   # source isn't H.264 Baseline -> re-encode
+    audio_source: inject_mix                          # optional — keep its audio + overlay announcements
+  - name: porch
+    host: 192.168.1.201
     mode: transcode
-    audio_source: inject_mix                          # keep its audio + overlay announcements
+    audio_source: inject_mix
 ```
 
 ### Option B — via a go2rtc / Frigate restream (recommended if you already run one)
@@ -188,12 +188,14 @@ needed for those cameras:
 lan_ip: 192.168.1.100
 
 cameras:
-  - name: frontporch
-    url: "rtsp://ccab4aaf-frigate:8554/frontporch_sub"   # go2rtc low-res (sub) restream
+  - name: sideyard
+    url: "rtsp://ccab4aaf-frigate:8554/sideyard_sub"     # go2rtc low-res (sub) restream
     mode: copy                                            # pass-through H.264 -> copy works
-  - name: garagedoors
-    url: "rtsp://ccab4aaf-frigate:8554/garagedoors_sub"
+    audio_source: inject_mix                              # optional
+  - name: garage
+    url: "rtsp://ccab4aaf-frigate:8554/garage_sub"
     mode: copy
+    audio_source: inject_mix
 ```
 
 > **Stream names & host:** `ccab4aaf-frigate` is the standard Frigate add-on's internal hostname and
