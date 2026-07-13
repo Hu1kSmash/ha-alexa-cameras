@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.7
+
+- **`on_demand` logging is now truly quiet.** An on-demand camera announces its idle wait
+  **once**, then stays silent. (In 1.9.6 a source that takes ~30s to *time out* — like Frigate
+  birdseye — still logged one benign "waiting to resume" line per retry cycle; now it doesn't.)
+
 ## 1.9.6
 
 - **New: per-camera `on_demand` flag (an *On-demand* checkbox in the Cameras table).** For a

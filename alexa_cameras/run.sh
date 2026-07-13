@@ -166,18 +166,14 @@ hls_loop() {
       2>&1 | "${filt[@]}" | sed "s/^/[$cam] /"
     ran=$(( $(date +%s) - start ))
     if [ "$on_demand" = "1" ]; then
-      if [ "$ran" -ge 30 ]; then
-        waiting=0
-        echo "[$(date +%H:%M:%S)] $cam (on-demand) stream ended after ${ran}s; waiting for it to resume"
-        delay=5
-      elif [ "$waiting" = "0" ]; then
-        echo "[$(date +%H:%M:%S)] $cam (on-demand) source idle / not producing — waiting quietly (errors suppressed until it returns)"
+      # Announce the wait exactly ONCE, then stay silent while it's idle (a source that takes
+      # ~30s to time out, like birdseye, would otherwise log a line every cycle). No attempt to
+      # guess "was it serving?" — when it's actually up, ffmpeg runs and doesn't reach here.
+      if [ "$waiting" = "0" ]; then
+        echo "[$(date +%H:%M:%S)] $cam (on-demand) source idle / not producing — waiting quietly; errors suppressed until it returns"
         waiting=1
-        delay=15
-      else
-        delay=15
       fi
-      sleep "$delay"
+      sleep 15
       continue
     fi
     if [ "$ran" -ge 30 ]; then
