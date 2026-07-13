@@ -305,8 +305,10 @@ you serve from the add-on.
 # Based on the community Home Assistant Alexa Smart Home Lambda:
 #   Copyright 2019 Jason Hu <awaregit at gmail.com>
 #   Modified 2020, refactored/modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
+#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
 # file except in compliance with the License. You may obtain a copy of the License at
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Modified 2026 by Tom Hirt (github.com/Hu1kSmash) for the ha-alexa-cameras add-on:
