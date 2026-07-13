@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Tom Hirt
 """Ingress Web UI for the Alexa Cameras (HLS) add-on.
 
 Self-managed config: the add-on's real configuration lives in /data/config.yaml,

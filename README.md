@@ -214,10 +214,10 @@ Everything about running the add-on lives in the docs — this README is just th
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+**Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Copyright 2026 Tom Hirt.
 
 **Third-party:** the example AWS Lambda in the
 [end-to-end setup guide](docs/END-TO-END-SETUP.md) is derived from the community Home
-Assistant Alexa Smart Home Lambda by Jason Hu and Matthew Hilton, used under the
-**Apache License 2.0**. Those derived portions remain under Apache-2.0 (see the
-attribution header in that code block).
+Assistant Alexa Smart Home Lambda by Jason Hu and Matthew Hilton, also under the
+**Apache License 2.0** (see the attribution header in that code block).

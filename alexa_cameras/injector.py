@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Tom Hirt
 """Birdseye audio injector (experimental).
 
 Plays announcement audio THROUGH a camera's stream instead of as a separate Alexa

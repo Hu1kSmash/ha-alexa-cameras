@@ -1,0 +1,16 @@
+ha-alexa-cameras
+Copyright 2026 Tom Hirt
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+these files except in compliance with the License. A copy of the License is in
+the LICENSE file, or at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Third-party attributions
+--------------------------------------------------------------------------------
+
+The example AWS Lambda in docs/END-TO-END-SETUP.md is derived from the community
+Home Assistant Alexa Smart Home Lambda:
+    Copyright 2019 Jason Hu <awaregit at gmail.com>
+    Modified 2020, refactored/modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
+Licensed under the Apache License, Version 2.0.

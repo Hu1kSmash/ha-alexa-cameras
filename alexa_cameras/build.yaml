@@ -6,4 +6,4 @@ build_from:
   i386: ghcr.io/home-assistant/i386-base:3.19
 labels:
   org.opencontainers.image.source: https://github.com/Hu1kSmash/ha-alexa-cameras
-  org.opencontainers.image.licenses: MIT
+  org.opencontainers.image.licenses: Apache-2.0

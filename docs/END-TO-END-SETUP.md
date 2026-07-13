@@ -311,11 +311,11 @@ you serve from the add-on.
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Modified 2026 by Tom Hirt (github.com/Hu1kSmash) for the ha-alexa-cameras add-on:
+# Modified 2026 by Tom Hirt for the ha-alexa-cameras add-on:
 # adds the Alexa.CameraStreamController HLS override + CAMERA_MAP, long-lived-token
 # auth (with an optional USE_DIRECTIVE_TOKEN mode), token-redacted debug logging, and
-# structured Alexa error responses. Shipped with ha-alexa-cameras (MIT); the portions
-# derived from the work above remain under Apache-2.0.
+# structured Alexa error responses. Shipped with the ha-alexa-cameras project, which
+# (like the work above) is licensed under the Apache License, Version 2.0.
 
 import json
 import logging

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Tom Hirt
 # Alexa Cameras (HLS) — serve RTSP cameras to Amazon Echo Show / Alexa as
 # H.264 Baseline MPEG-TS HLS over HTTP, read directly from each camera.
 #

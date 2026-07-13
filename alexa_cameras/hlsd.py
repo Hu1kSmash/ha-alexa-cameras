@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Tom Hirt
 """HLS/snapshot file server on :8888 — with lazy on-demand triggering.
 
 Serves /tmp/hls statically (the per-camera stream.m3u8, .ts segments, and snapshot.jpg),
