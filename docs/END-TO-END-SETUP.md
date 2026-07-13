@@ -105,16 +105,31 @@ Throughout, replace:
 
 ## [1] The add-on (recap)
 
-Already covered in the [README](../README.md). Confirm it works on your LAN before
-continuing — from another machine:
+You set this up when you followed the add-on's **[Documentation](../alexa_cameras/DOCS.md)**.
+Before wiring anything external, confirm it's healthy on your LAN — the add-on's own
+**Web UI** is the easiest way:
+
+- **Validate streams** tab — every camera should read **green**: its **Source** and
+  **Output** are both live, decodable **H.264 Baseline/Main**. This is the whole point —
+  if the output isn't Baseline/Main here, the Echo will show black no matter how the
+  tunnel and skill are set up.
+- **Configuration** tab — make sure the required **Home Assistant IP** is set (a private
+  IPv4, *not* a hostname); the *Served at* and *Public URL check* links depend on it.
+
+![The add-on's Configuration tab](images/config-tab.png)
+
+Two more tabs matter later: once the tunnel + Lambda are up, **Public URL check** tests
+the external URL (a **403** there = reachable + WAF-locked, which is what you want), and
+during the test the **Logs** tab shows a `GET /<name>/stream.m3u8` from a **`172.x`**
+address the moment Amazon's relay reaches the add-on — the fastest way to tell "black
+Echo" apart from "not reaching the add-on".
+
+**Optional — verify from the command line** (e.g. from another machine) instead of the
+Validate streams tab:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" http://<ha-host>:8888/<name>/stream.m3u8   # expect 200
-```
 
-And confirm the stream is **decodable H.264** (this is the whole point):
-
-```bash
 ffprobe -v error -i http://<ha-host>:8888/<name>/stream.m3u8 \
   -show_entries stream=codec_name,profile,width,height -of default=noprint_wrappers=1
 # expect: codec_name=h264, profile=Constrained Baseline (or Baseline/Main)
@@ -122,20 +137,6 @@ ffprobe -v error -i http://<ha-host>:8888/<name>/stream.m3u8 \
 ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 4 -f null -
 # expect: NO output (no "non-existing PPS 0 referenced")
 ```
-
-> **Prefer no CLI?** The add-on's **Web UI** does all of this: the **Validate streams**
-> tab checks each camera's source + output, and once the tunnel + Lambda are up the
-> **Public URL check** tab tests the external URL (a **403** there = reachable +
-> WAF-locked, which is what you want). And when you get to the test, the **Logs** tab
-> shows a `GET /<name>/stream.m3u8` from a **`172.x`** address the moment Amazon's relay
-> actually reaches the add-on — the fastest way to tell "black Echo" apart from "not
-> reaching the add-on". Remember to set the required **Home Assistant IP** in the
-> Configuration tab so those links point at your real LAN address.
-
-Configure everything in the add-on's **Web UI → Configuration** tab (the **Home
-Assistant IP** is required — a private IPv4, *not* a hostname):
-
-![The add-on's Configuration tab](images/config-tab.png)
 
 ---
 
