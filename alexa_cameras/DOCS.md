@@ -665,8 +665,8 @@ expose it to the internet, and protect it with `inject_token`.
 | Alexa black, **no `172.x`** in Logs when asked | Stream not reaching the add-on | Look upstream: Cloudflare / WAF / tunnel / Lambda (see the setup guide). |
 | Camera on Alexa **frozen** after an add-on restart/update | Alexa holds the last frame when the HLS stream restarts | Re-show it (*"Alexa, show &lt;camera&gt;"*). Any add-on restart interrupts a live view. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
-| **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then backs off gently and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
-| **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on doesn't hammer the encoder. |
+| **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then leaves it alone while idle (connecting only when watched) and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
+| **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on only connects to it while it's being watched, never churning the encoder. |
 | Log timestamps are in **UTC** | Older build | Update to **≥ 1.9.0** (logs use the host's local timezone). |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
@@ -755,9 +755,10 @@ real-time), adding several seconds to *"show birdseye"* while a normal camera op
 > viewing *does* wake it, it's just not instant). **The thing to avoid is *hammering* it:**
 > reconnecting to birdseye aggressively can wedge that encoder and cascade into Frigate (detection
 > stops — see the birdseye note under *Validate streams* above). So serve birdseye through the add-on
-> with **`on_demand: true`** (gentle backoff, no hammering), and lean on the **auto-show-on-detection
-> automation** below to bring it up right when there's something to see — rather than a manual
-> *"show birdseye."*
+> with **`on_demand: true`**, which makes the add-on **connect to it only while it's actually being
+> watched and stay off it entirely when idle** — nothing to hammer. Then lean on the
+> **auto-show-on-detection automation** below to bring it up right when there's something to see —
+> rather than a manual *"show birdseye."*
 
 That makes `camera.birdseye` a fully valid Alexa camera — it displays correctly on an
 Echo Show. **But saying *"Alexa, show camera birdseye"* usually fails:** Alexa
