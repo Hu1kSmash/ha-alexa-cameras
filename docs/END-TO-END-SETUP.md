@@ -302,20 +302,27 @@ you serve from the add-on.
 ```python
 # Alexa Smart Home skill Lambda for the ha-alexa-cameras add-on.
 #
-# Based on the community Home Assistant Alexa Smart Home Lambda:
-#   Copyright 2019 Jason Hu <awaregit at gmail.com>
-#   Modified 2020, refactored/modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
+# Copyright 2019 Jason Hu <awaregit at gmail.com>
+# Modified 2020 Matthew Hilton <matthilton2005@gmail.com>
+# Refactor and Modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
+# Modified 2026 Tom Hirt (ha-alexa-cameras add-on)
 #
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
-# file except in compliance with the License. You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Modified 2026 by Tom Hirt for the ha-alexa-cameras add-on:
-# adds the Alexa.CameraStreamController HLS override + CAMERA_MAP, long-lived-token
-# auth (with an optional USE_DIRECTIVE_TOKEN mode), token-redacted debug logging, and
-# structured Alexa error responses. Shipped with the ha-alexa-cameras project, which
-# (like the work above) is licensed under the Apache License, Version 2.0.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Changes in this version (Tom Hirt, 2026, for ha-alexa-cameras): adds the
+# Alexa.CameraStreamController HLS override + CAMERA_MAP, long-lived-token auth
+# (with an optional USE_DIRECTIVE_TOKEN mode), token-redacted debug logging, and
+# structured Alexa error responses.
 
 import json
 import logging

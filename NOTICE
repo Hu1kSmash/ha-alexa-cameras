@@ -12,5 +12,6 @@ Third-party attributions
 The example AWS Lambda in docs/END-TO-END-SETUP.md is derived from the community
 Home Assistant Alexa Smart Home Lambda:
     Copyright 2019 Jason Hu <awaregit at gmail.com>
-    Modified 2020, refactored/modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
+    Modified 2020 Matthew Hilton <matthilton2005@gmail.com>
+    Refactor and Modernised 2025 Matthew Hilton <matthilton2005@gmail.com>
 Licensed under the Apache License, Version 2.0.
