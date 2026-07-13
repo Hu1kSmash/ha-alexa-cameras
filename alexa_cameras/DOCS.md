@@ -329,9 +329,10 @@ tell where a "black Echo Show" problem is:
 (Requests from your own browser — e.g. the *Served at* link — show your machine's LAN IP,
 which is how you tell them apart from Amazon's `172.x` relay traffic.)
 
-The Logs tab — internal validation traffic from `127.0.0.1`:
+The Logs tab — the camera workers starting up (each `Starting camera …` line shows the source and
+`mode`), then internal validation traffic from `127.0.0.1`:
 
-![The Logs tab — internal validation traffic](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs-validation-streams.png)
+![The Logs tab — camera workers starting, then internal 127.0.0.1 validation traffic](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/logs.png)
 
 …and Amazon's relay reaching the add-on while an Echo shows a camera — every request from
 a `172.x` address (`172.30.32.1`, via the tunnel):
