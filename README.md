@@ -212,6 +212,12 @@ Everything about running the add-on lives in the docs — this README is just th
   around the add-on: Cloudflare Tunnel + WAF, the Alexa Smart Home skill, and the AWS Lambda
   camera override. (The add-on docs link you here when you're ready.)
 
+## Support
+
+Questions, bug reports, and feature requests → please
+[open an issue on GitHub](https://github.com/Hu1kSmash/ha-alexa-cameras/issues). That's the
+best way to reach the maintainer and keep the answer searchable for others.
+
 ## License
 
 **Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
