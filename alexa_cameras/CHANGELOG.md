@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.4
+
+- Docs: fixed the example camera `porch` to `mode: copy` in the Option A config and the Logs example
+  (it was `transcode` there but `copy` in the screenshots, the Validate write-up, and the birdseye
+  recipe) so every example is internally consistent.
+
 ## 1.16.3
 
 - Docs: added a **Jittery or stuttering video** section explaining that an Echo Show pulls a

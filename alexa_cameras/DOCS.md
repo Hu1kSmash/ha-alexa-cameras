@@ -173,7 +173,7 @@ cameras:
     audio_source: inject_mix                          # optional — keep its audio + overlay announcements
   - name: porch
     host: 192.168.1.201
-    mode: transcode
+    mode: copy                                        # this camera's sub stream is already H.264 Baseline -> copy
     audio_source: inject_mix
 ```
 
@@ -507,14 +507,14 @@ so you can compare them against your own output line-for-line.
 ### What healthy startup looks like
 
 Right after the add-on starts (or after you save a config change), you'll see each camera worker
-come up. The examples below use the **Example configuration** from earlier — `driveway`/`porch`
-(direct, `transcode`), `sideyard`/`garage` (restream, `copy`), and a `birdseye` follow-cam
-(`on_demand`):
+come up. The examples below use the **Example configuration** from earlier — `driveway`
+(direct, `transcode`), `porch` (direct, `copy`), `sideyard`/`garage` (restream, `copy`), and a
+`birdseye` follow-cam (`on_demand`):
 
 ```text
 [init] timezone: America/Denver
 Starting camera 'driveway' (192.168.1.200, mode=transcode, audio=inject_mix)
-Starting camera 'porch' (192.168.1.201, mode=transcode, audio=inject_mix)
+Starting camera 'porch' (192.168.1.201, mode=copy, audio=inject_mix)
 Starting camera 'sideyard' (rtsp://ccab4aaf-frigate:8554/sideyard_sub, mode=copy, audio=inject_mix)
 Starting camera 'garage' (rtsp://ccab4aaf-frigate:8554/garage_sub, mode=copy, audio=inject_mix)
 Starting camera 'birdseye' (rtsp://ccab4aaf-frigate:8554/birdseye, mode=transcode, audio=inject, on-demand)
