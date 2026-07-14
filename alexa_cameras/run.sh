@@ -77,6 +77,27 @@ try: v=int(yaml.safe_load(open("/data/config.yaml")).get("hls_list_size",4))
 except Exception: v=4
 print(max(2,min(10,v)))' 2>/dev/null)"
   [ -z "$HLS_LIST_SIZE" ] && HLS_LIST_SIZE=4
+  # Transcode output controls (only affect mode: transcode): a WxH box the video is scaled *within*
+  # (aspect preserved), the output fps (which also sets the 1-second keyframe GOP), and an optional
+  # bitrate cap in kbps (0 = uncapped / quality-based). Validated + clamped here; emitted as "W H FPS BR".
+  read -r TRANSCODE_W TRANSCODE_H TRANSCODE_FPS TRANSCODE_BR <<< "$(python3 -c '
+import yaml
+try: o=yaml.safe_load(open("/data/config.yaml")) or {}
+except Exception: o={}
+s=str(o.get("transcode_scale","1280x720")).lower().replace(" ","")
+try:
+    w,h=s.split("x"); w=int(w); h=int(h)
+    if not (160<=w<=1920 and 120<=h<=1080): raise ValueError
+except Exception:
+    w,h=1280,720
+try: f=int(o.get("transcode_fps",15))
+except Exception: f=15
+f=max(5,min(30,f))
+try: b=int(o.get("transcode_bitrate",0))
+except Exception: b=0
+b=0 if b<=0 else max(200,min(20000,b))
+print(w,h,f,b)' 2>/dev/null)"
+  [ -z "$TRANSCODE_W" ] && { TRANSCODE_W=1280; TRANSCODE_H=720; TRANSCODE_FPS=15; TRANSCODE_BR=0; }
   # One line per camera: name|host|path|mode|url
   mapfile -t CAMLINES < <(python3 - <<'PY'
 import yaml
@@ -95,6 +116,7 @@ for c in (o.get("cameras") or []):
         str(c.get("url", "")).strip(),
         str(c.get("audio_source", "")).strip(),
         "1" if str(c.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on") else "",
+        str(c.get("scale", "")).strip().lower().replace(" ", ""),
     ]))
 PY
 )
@@ -111,7 +133,7 @@ req_fresh() {
 # copy  = camera stream is already H.264 -> remux only (near-zero CPU)
 # transcode = source is H.265/other -> scale to 720p H.264 Baseline for Alexa
 hls_loop() {
-  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}" on_demand="${7:-}"
+  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}" on_demand="${7:-}" scale="${8:-}"
   local src
   mkdir -p "$HLS/$cam"
   if [ -n "$url" ]; then
@@ -123,13 +145,28 @@ hls_loop() {
   else
     src="rtsp://${ip}:${RPORT}${path}"
   fi
+  # Transcode video pipeline, built from the global transcode_* controls (read_config) plus an
+  # optional per-camera `scale` override (WxH). Scale is aspect-preserving *within* the WxH box
+  # (force_original_aspect_ratio=decrease) with even dimensions (force_divisible_by=2) so non-16:9
+  # sources aren't stretched. fps also drives the 1-second keyframe GOP (-g/-keyint_min = fps).
+  local TW="$TRANSCODE_W" TH="$TRANSCODE_H"
+  if [ -n "$scale" ]; then
+    local cw="${scale%%x*}" ch="${scale##*x}"
+    case "$cw" in ''|*[!0-9]*) cw="" ;; esac
+    case "$ch" in ''|*[!0-9]*) ch="" ;; esac
+    [ -n "$cw" ] && [ -n "$ch" ] && { TW="$cw"; TH="$ch"; }
+  fi
+  local VF="scale=${TW}:${TH}:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=${TRANSCODE_FPS:-15}"
+  local -a X264=(-c:v libx264 -profile:v baseline -level:v 3.1 -pix_fmt yuv420p -preset veryfast \
+                 -tune zerolatency -g "${TRANSCODE_FPS:-15}" -keyint_min "${TRANSCODE_FPS:-15}" \
+                 -force_key_frames "expr:gte(t,n_forced*1)" -bf 0)
+  local -a BRARGS=()
+  [ "${TRANSCODE_BR:-0}" -gt 0 ] 2>/dev/null && BRARGS=(-maxrate "${TRANSCODE_BR}k" -bufsize "$((TRANSCODE_BR*2))k")
   local -a venc
   if [ "$mode" = "copy" ]; then
     venc=(-c:v copy)
   else
-    venc=(-vf "scale=1280:720,fps=15" -c:v libx264 -profile:v baseline -level:v 3.1 \
-          -pix_fmt yuv420p -preset veryfast -tune zerolatency \
-          -g 15 -keyint_min 15 -force_key_frames "expr:gte(t,n_forced*1)" -bf 0)
+    venc=(-vf "$VF" "${X264[@]}" ${BRARGS[@]+"${BRARGS[@]}"})
   fi
   # Optional synthetic audio track for sources that carry no audio of their own
   # (e.g. Frigate birdseye, a silent mosaic). Alexa only plays a camera's audio
@@ -165,9 +202,8 @@ hls_loop() {
         amap=(-filter_complex "[0:a][1:a]amix=inputs=2:normalize=0:duration=first[aout]" \
               -map 0:v -map "[aout]" -max_interleave_delta 0)
       else
-        venc=(-c:v libx264 -profile:v baseline -level:v 3.1 -pix_fmt yuv420p -preset veryfast \
-              -tune zerolatency -g 15 -keyint_min 15 -force_key_frames "expr:gte(t,n_forced*1)" -bf 0)
-        amap=(-filter_complex "[0:v]scale=1280:720,fps=15[vout];[0:a][1:a]amix=inputs=2:normalize=0:duration=first[aout]" \
+        venc=("${X264[@]}" ${BRARGS[@]+"${BRARGS[@]}"})
+        amap=(-filter_complex "[0:v]${VF}[vout];[0:a][1:a]amix=inputs=2:normalize=0:duration=first[aout]" \
               -map "[vout]" -map "[aout]" -max_interleave_delta 0)
       fi ;;
   esac
@@ -264,10 +300,10 @@ start_workers() {
   # here guarantees a clean slate each start and also removes dirs for cameras you've since deleted.
   # (Workers are already stopped when this runs on reload; on first boot the dir is empty anyway.)
   rm -rf "$HLS"/* 2>/dev/null
-  local count=0 line name host path mode url audio_source on_demand
+  local count=0 line name host path mode url audio_source on_demand scale
   for line in "${CAMLINES[@]}"; do
     [ -z "$line" ] && continue
-    IFS='|' read -r name host path mode url audio_source on_demand <<< "$line"
+    IFS='|' read -r name host path mode url audio_source on_demand scale <<< "$line"
     [ -z "$name" ] && continue
     if [ "$audio_source" = "inject" ] || [ "$audio_source" = "inject_mix" ]; then
       mkdir -p /tmp/inject && mkfifo -m 600 "/tmp/inject/$name.pcm" 2>/dev/null
@@ -277,7 +313,7 @@ start_workers() {
     else
       echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
     fi
-    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" & WPIDS+=($!)
+    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" "$scale" & WPIDS+=($!)
     snap_loop "$name" & WPIDS+=($!)
     count=$((count + 1))
   done

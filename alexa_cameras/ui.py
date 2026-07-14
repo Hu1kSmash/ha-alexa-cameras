@@ -114,6 +114,18 @@ def dump_yaml(data):
                           allow_unicode=True)
 
 
+def _scale_error(val, where):
+    """Validate a WIDTHxHEIGHT transcode scale string. Returns an error message or None."""
+    s = str(val).strip().lower().replace(" ", "")
+    m = re.match(r"^(\d{2,4})x(\d{2,4})$", s)
+    if not m:
+        return f"{where} must look like WIDTHxHEIGHT (e.g. 1280x720)"
+    w, h = int(m.group(1)), int(m.group(2))
+    if not (160 <= w <= 1920 and 120 <= h <= 1080):
+        return f"{where} must be within 160x120 and 1920x1080"
+    return None
+
+
 def validate_config(data):
     if not isinstance(data, dict):
         return "config must be a mapping (key: value)"
@@ -137,6 +149,27 @@ def validate_config(data):
             return "hls_list_size must be a whole number between 2 and 10"
         if not 2 <= hv <= 10:
             return "hls_list_size must be between 2 and 10 (lower = less lag but a smaller buffer)"
+    ts = data.get("transcode_scale")
+    if ts not in (None, ""):
+        err = _scale_error(ts, "transcode_scale")
+        if err:
+            return err
+    tf = data.get("transcode_fps")
+    if tf is not None:
+        try:
+            tfv = int(tf)
+        except (TypeError, ValueError):
+            return "transcode_fps must be a whole number between 5 and 30"
+        if not 5 <= tfv <= 30:
+            return "transcode_fps must be between 5 and 30"
+    tb = data.get("transcode_bitrate")
+    if tb not in (None, "", 0):
+        try:
+            tbv = int(tb)
+        except (TypeError, ValueError):
+            return "transcode_bitrate must be a whole number in kbps (e.g. 1500), or blank for uncapped"
+        if not 200 <= tbv <= 20000:
+            return "transcode_bitrate must be between 200 and 20000 kbps (or blank for uncapped)"
     cams = data.get("cameras")
     if cams is None:
         return "missing 'cameras:' list"
@@ -158,6 +191,11 @@ def validate_config(data):
             return f"camera '{name}' needs either a host or a url"
         if str(c.get("mode", "")).strip() not in ("copy", "transcode"):
             return f"camera '{name}' mode must be 'copy' or 'transcode'"
+        sc = c.get("scale")
+        if sc not in (None, ""):
+            err = _scale_error(sc, f"camera '{name}' scale")
+            if err:
+                return err
     return None
 
 
@@ -1019,6 +1057,13 @@ INDEX_HTML = r"""<!doctype html>
           <label>HLS buffer segments<input id="f-hls-list" type="number" min="2" max="10" placeholder="4"></label>
         </div>
         <p class="sub" style="margin:6px 0 0">How many short segments Alexa buffers before playing. <b>Lower = less lag</b> (Alexa starts closer to real&#8209;time), but a smaller buffer can <b>stall</b> on a slow fetch. Default <b>4</b>; try <b>3</b> then <b>2</b> to trim latency, watching for stutters. Each segment is as long as your camera's keyframe interval, so <b>1&#8209;second keyframes</b> on the sub stream are the bigger win.</p>
+        <h3 style="margin:16px 0 8px;font-size:.95rem">Transcode output <span style="opacity:.55;font-weight:400">(only affects <code>mode: transcode</code> cameras)</span></h3>
+        <div class="cfg-grid">
+          <label>Resolution<input id="f-tscale" type="text" placeholder="1280x720" pattern="[0-9]{2,4}[xX][0-9]{2,4}"></label>
+          <label>Frame rate (fps)<input id="f-tfps" type="number" min="5" max="30" placeholder="15"></label>
+          <label>Bitrate cap (kbps)<input id="f-tbr" type="number" min="200" max="20000" placeholder="uncapped"></label>
+        </div>
+        <p class="sub" style="margin:6px 0 0">These apply <b>only when a camera is transcoded</b> (H.265 / H.264&#8209;High sources like Frigate birdseye); <code>copy</code> cameras keep their source resolution. <b>Resolution</b> is a box the video is scaled <i>within</i> (aspect preserved, no stretch) &mdash; drop to e.g. <code>854x480</code> to cut bandwidth/latency on a small or far Echo; default <b>1280x720</b>. <b>Frame rate</b> also sets the keyframe interval (default <b>15</b>). <b>Bitrate cap</b> limits peak bandwidth (blank = quality&#8209;based, uncapped) &mdash; often the biggest lever for a jittery, Wi&#8209;Fi&#8209;starved stream. (A per&#8209;camera <code>scale</code> override is available in <b>View as YAML</b>.)</p>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>
@@ -1169,6 +1214,9 @@ function renderForm(){
   document.getElementById('f-port').value = CFG.rtsp_port || 554;
   document.getElementById('f-path').value = CFG.default_path || '';
   document.getElementById('f-hls-list').value = CFG.hls_list_size || '';
+  document.getElementById('f-tscale').value = CFG.transcode_scale || '';
+  document.getElementById('f-tfps').value = CFG.transcode_fps || '';
+  document.getElementById('f-tbr').value = CFG.transcode_bitrate || '';
   var _it=document.getElementById('f-inject-token'); if(_it) _it.value = CFG.inject_token || '';
   populateTtsEngines();
   var _oc=(CFG.lan_ip||'').split('.');
@@ -1218,6 +1266,9 @@ function gatherForm(){
   d.rtsp_port = parseInt(val('f-port')||'554',10);
   if(val('f-path')) d.default_path = val('f-path'); else delete d.default_path;
   var hls=parseInt(val('f-hls-list'),10); if(hls>=2&&hls<=10&&hls!==4) d.hls_list_size=hls; else delete d.hls_list_size;
+  var ts=(val('f-tscale')||'').trim().toLowerCase().replace(/\s/g,''); if(/^\d{2,4}x\d{2,4}$/.test(ts)&&ts!=='1280x720') d.transcode_scale=ts; else delete d.transcode_scale;
+  var tf=parseInt(val('f-tfps'),10); if(tf>=5&&tf<=30&&tf!==15) d.transcode_fps=tf; else delete d.transcode_fps;
+  var tb=parseInt(val('f-tbr'),10); if(tb>=200&&tb<=20000) d.transcode_bitrate=tb; else delete d.transcode_bitrate;
   if(val('f-inject-token')) d.inject_token = val('f-inject-token'); else delete d.inject_token;
   if(val('f-tts-engine')) d.tts_engine = val('f-tts-engine'); else delete d.tts_engine;
   var _lan=lanFromFields(); if(_lan) d.lan_ip=_lan; else delete d.lan_ip;

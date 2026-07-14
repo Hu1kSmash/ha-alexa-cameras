@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.17.0
+
+- **New transcode output controls** (Configuration → **Streaming (advanced)**), for `mode: transcode`
+  cameras only:
+  - **Resolution** (`transcode_scale`, default `1280x720`) — now **aspect-preserving**: the video is
+    scaled *within* the WxH box instead of stretched, so non-16:9 sources are no longer distorted.
+    Drop it (e.g. `854x480`) to cut bandwidth/latency on a small or far Echo.
+  - **Frame rate** (`transcode_fps`, default `15`) — also sets the keyframe interval.
+  - **Bitrate cap** (`transcode_bitrate`, kbps; default uncapped) — bounds peak segment size, often the
+    biggest lever for a jittery, Wi-Fi-starved stream.
+  - A per-camera **`scale`** override (same `WIDTHxHEIGHT` form) is available via **View as YAML**.
+  `copy` cameras are unaffected — they keep their source resolution/bitrate.
+
 ## 1.16.13
 
 - Docs: document the **output codecs** — every camera is delivered **H.264 + AAC** (48 kHz stereo
