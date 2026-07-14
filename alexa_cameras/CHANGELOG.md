@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.18.7
+
+- Startup **ASCII banner** — a big visual break in the log so add-on restarts stand out at a glance
+  (and it looks neat), with the version and start time.
+- Startup **`[diag]` config dump** — prints everything a support request needs: version, timezone,
+  ffmpeg build, HA IP, ports, RTSP defaults, streaming defaults, TTS engine, and a per-camera summary
+  (mode / source / audio / on-demand / any per-camera overrides). **Passwords and tokens are masked**,
+  so the whole block is safe to paste into a GitHub issue.
+
 ## 1.18.6
 
 - Logs: the injector now logs the **actual announcement text** (or URL) that was played, e.g.

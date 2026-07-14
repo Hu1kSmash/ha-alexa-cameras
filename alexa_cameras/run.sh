@@ -36,6 +36,61 @@ exec > >(tee -a "$LOG") 2>&1
 # Timestamped, single-line log line for add-on activity (startup, reloads, watchdog, etc.).
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
+VERSION="$(python3 -c 'import yaml;print(yaml.safe_load(open("/manifest.yaml")).get("version",""))' 2>/dev/null)"
+
+# Big startup banner — a clear visual break in the log so restarts are easy to spot, and it looks neat.
+banner() {
+  printf '\n████████████████████████████████████████████████████████████████\n'
+  cat <<'ART'
+   █████╗ ██╗     ███████╗██╗  ██╗ █████╗
+  ██╔══██╗██║     ██╔════╝╚██╗██╔╝██╔══██╗
+  ███████║██║     █████╗   ╚███╔╝ ███████║
+  ██╔══██║██║     ██╔══╝   ██╔██╗ ██╔══██║
+  ██║  ██║███████╗███████╗██╔╝ ██╗██║  ██║
+  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
+ART
+  printf '        C A M E R A S  (HLS)  —  RTSP → Amazon Echo Show\n'
+  printf '        v%s   started %s\n' "${VERSION:-?}" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  printf '████████████████████████████████████████████████████████████████\n\n'
+}
+
+# One-shot diagnostics dump at startup: everything a support request would need, secrets masked.
+# Safe to paste into an issue — no rtsp password, no inject token.
+print_diag() {
+  log "──── configuration summary (safe to share — passwords/tokens masked) ────"
+  log "version=${VERSION:-?}  tz=${TZ_NAME:-UTC}  ffmpeg=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')"
+  python3 - <<'PY'
+import re, yaml
+try:
+    o = yaml.safe_load(open("/data/config.yaml")) or {}
+except Exception as e:
+    print("[diag] config parse ERROR: %s" % e); raise SystemExit
+mask = lambda u: re.sub(r'(rtsp://[^:@/]+):[^@/]*@', r'\1:***@', str(u))
+flag = lambda v: "SET" if str(v or "").strip() else "unset"
+print("[diag] lan_ip=%s   ports: hls=8888 inject=8790 ui=8099" % (o.get("lan_ip") or "NOT SET"))
+print("[diag] rtsp defaults: user=%r port=%s path=%r password=%s" % (
+    o.get("rtsp_user", ""), o.get("rtsp_port", 554), o.get("default_path", ""), flag(o.get("rtsp_password"))))
+print("[diag] inject_token=%s   tts_engine=%r   ha_base=%s" % (
+    flag(o.get("inject_token")), o.get("tts_engine", ""), o.get("ha_base") or "(default)"))
+print("[diag] streaming defaults: buffer=%s scale=%s mode=%s fps=%s bitrate=%s" % (
+    o.get("hls_list_size", 4), o.get("transcode_scale", "1280x720"), o.get("scale_mode", "fit"),
+    o.get("transcode_fps", 15), o.get("transcode_bitrate") or "uncapped"))
+cams = o.get("cameras") or []
+print("[diag] cameras: %d" % len(cams))
+for c in cams:
+    src = ("url " + mask(c["url"])) if c.get("url") else ("host=" + str(c.get("host", "")))
+    ov = ["%s=%s" % (lab, c[k]) for k, lab in
+          (("scale", "scale"), ("scale_mode", "mode"), ("fps", "fps"),
+           ("bitrate", "br"), ("hls_list_size", "buf"), ("tts_engine", "tts"))
+          if str(c.get(k, "")).strip()]
+    od = "YES" if str(c.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on") else "no"
+    print("[diag]   %-16s %-10s %-52s audio=%-10s on_demand=%s%s" % (
+        c.get("name", ""), c.get("mode", "transcode"), src, (c.get("audio_source") or "none"), od,
+        ("  [" + " ".join(ov) + "]") if ov else ""))
+print("[diag] " + "─" * 60)
+PY
+}
+
 # Use the host's local timezone for all log timestamps. The image ships tzdata, but
 # s6-overlay strips TZ from the service environment (only `docker exec` sessions get it),
 # so the main process would default to UTC. s6 does persist the env as files, so read the
@@ -66,6 +121,9 @@ cfg["cameras"] = o.get("cameras", [])
 yaml.safe_dump(cfg, open(sys.argv[2], "w"), sort_keys=False, default_flow_style=False)
 PY
 fi
+
+banner
+print_diag
 
 WPIDS=()   # PIDs of the current camera workers (hls_loop + snap_loop)
 
