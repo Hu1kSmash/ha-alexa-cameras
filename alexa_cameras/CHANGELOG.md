@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.15.3
+
+- **The latency readout now exposes the camera's detected I-frame interval** (in *frames* — the exact
+  value a camera's web UI asks for), so you can trace the lag straight back to the setting and tune
+  it. In `copy` mode a segment is one keyframe interval, so the readout shows e.g. *"source keyframe
+  every 2.0s ≈ camera I-frame interval 30 @ 15 fps — set it to 15 for 1s segments"*, doing the
+  frames = seconds × fps math for you. Transcode-mode streams are labelled as add-on-controlled
+  instead (changing the camera keyframe interval wouldn't help there).
+- **Docs: new "Live-view latency" section** in the add-on Documentation walking through the whole
+  model — segment length (camera keyframe interval) × buffer segments (`hls_list_size`) = lag — with
+  the frames math and a lever table for dialing latency down to ~2s.
+
 ## 1.15.2
 
 - **Validate streams now shows live-view latency** on each camera's **Output** check —

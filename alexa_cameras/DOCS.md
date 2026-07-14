@@ -135,7 +135,7 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 
 | Field | Required | Description |
 |---|---|---|
-| **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s. Leave this blank to use the default of 4. |
+| **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s — the **Validate streams** tab detects and shows your camera's current I-frame interval so you can trace it back and tune it (see [Live-view latency](#live-view-latency)). Leave this blank to use the default of 4. |
 
 ---
 
@@ -255,11 +255,9 @@ on the add-on's own output. Per camera it reports:
 - **Source** — ffprobes the camera's RTSP feed and checks its codec/profile against the camera's
   `mode` — e.g. it flags an H.265 / H.264-**High** source left on `copy`.
 - **Output** — confirms the add-on's `:8888` HLS is live and decodable H.264 Baseline (what Alexa
-  actually opens). When the stream is live it also reports the **live-view latency** —
-  e.g. *"Alexa live view ≈ 8s behind real-time · 4 seg × 2.0s"* — measured straight from the
-  playlist's segment durations (in `copy` mode each segment is one **keyframe interval**, so
-  `4 × 2.0s ≈ 8s` of buffer). Lower it with **HLS buffer segments** (Configuration → Streaming) or by
-  shortening the camera's sub-stream keyframe interval to ~1s.
+  actually opens). When the stream is live it also reports the **live-view latency** and the detected
+  camera **I-frame interval** — see [Live-view latency](#live-view-latency)
+  below for how to read it and cut the lag.
 
 Each camera card also shows **how the add-on read its config**, in aligned columns under a header
 (**Mode · Source · Path · Audio · On-demand**) — so you can scan straight down a column and instantly
@@ -302,6 +300,67 @@ actually serving on `:8888` isn't H.264 Baseline/Main it warns *"OUTPUT is not H
 Alexa may show black"* — but on a bad `copy` the Source check red-errors first. The one exception is an
 **on-demand** source that's idle at probe time: it can't judge a stream that isn't flowing, so it reads
 **Idle** instead of an error (see the birdseye note below).
+
+### Live-view latency
+
+**Why the live view lags behind real-time — and how to make it snappy.** When a camera is live, the
+**Output** check also prints a latency line, e.g.:
+
+> ⏱ Alexa live view ≈ **8s** behind real-time · 4 seg × 2.0s
+> source keyframe every 2.0s ≈ camera **I-frame interval 30** @ 15 fps — set it to **15** for 1s segments
+
+Here's the whole model, because it generates a lot of questions:
+
+**Alexa plays HLS, and HLS is a rolling buffer of little video files ("segments").** The player
+starts near the **back** of that buffer, so how far behind real-time you are is simply:
+
+```
+lag  ≈  segment length (seconds)  ×  number of segments in the buffer
+```
+
+Those are **two independent knobs**, and the readout shows both (`4 seg × 2.0s = ~8s`):
+
+**1. Segment length — set by your *camera*, not the add-on.** In `copy` mode the add-on only
+remuxes; ffmpeg can only start a new segment **on a keyframe (I-frame)**. So a segment is exactly as
+long as your camera's **keyframe interval**. The add-on *asks* for 1-second segments (`-hls_time 1`),
+but it physically can't cut one until the next keyframe arrives — so if your camera emits a keyframe
+every 2 s, you get 2-second segments no matter what. **This is the single biggest lever.**
+
+  - Cameras express this setting as an **I-frame interval in *frames*** (sometimes labelled "GOP",
+    "keyframe interval", or "I-frame interval"). Convert with your frame rate:
+
+    ```
+    I-frame interval (frames)  =  keyframe interval (seconds)  ×  fps
+    ```
+
+    The Output readout does this for you and **shows the detected frame count** so you can find the
+    exact setting in your camera. In the example the sub stream is **15 fps** with **2.0-second**
+    segments → an I-frame interval of **30 frames** (30 ÷ 15 = 2 s). Log into the camera's web UI →
+    the **sub-stream** encode settings, find the value reading **30**, and change it to **15** (= your
+    fps → one keyframe per second). Segments become **1.0 s** → lag roughly **halves**. Don't go below
+    ~1 s (1 keyframe/sec); shorter keyframe intervals only add bitrate for no real latency gain.
+
+**2. Number of segments — the add-on's `hls_list_size` (Configuration → Streaming → HLS buffer
+segments).** Default **4**, range **2–10**. Lower = less lag, but a shallower buffer is less forgiving
+of a slow network fetch (watch for stutter). **You cannot set it to 1** — a live playlist needs at
+least a couple of segments or the player constantly runs dry and re-buffers; **2 is the floor.**
+
+**Putting it together** (using the example camera at 15 fps):
+
+| Change | Segment length | Buffer | Alexa lag |
+|---|---|---|---|
+| *(default)* | 2.0 s (I-frame 30) | 4 | **~8 s** |
+| Camera I-frame 30 → **15** (1 s keyframes) | 1.0 s | 4 | **~4 s** |
+| `hls_list_size` 4 → **2** | 2.0 s | 2 | **~4 s** |
+| **Both** (I-frame 15 **and** 2 segments) | 1.0 s | 2 | **~2 s** |
+
+Re-run Validate after each change and the ⏱ line updates live, so you can dial it in by feel.
+
+> **Transcode mode is different.** When a camera runs `mode: transcode` the add-on re-encodes the
+> video and inserts its **own** keyframes to honor `-hls_time 1`, so segments are ~1 s **regardless of
+> the camera's keyframe interval** — the readout says so and doesn't quote a camera I-frame value
+> (changing it wouldn't help). Transcoding costs CPU, though; if your sub stream is already H.264
+> Baseline, `copy` + a 1-second camera keyframe interval gives you low latency **and** low CPU.
 
 > ⚠️ **Heads-up about Frigate birdseye — it's an *on-demand, re-encoded* stream, so run it gently.**
 >

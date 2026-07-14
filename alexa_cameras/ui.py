@@ -257,6 +257,21 @@ def classify(stream):
     return False, label
 
 
+def stream_fps(stream):
+    """Frames per second as a rounded int, or None. Prefers avg_frame_rate, falls back to
+    r_frame_rate (some HLS/mpegts probes only fill the latter)."""
+    for key in ("avg_frame_rate", "r_frame_rate"):
+        fr = stream.get(key) or ""
+        if fr and fr not in ("0/0", "0"):
+            try:
+                n, d = fr.split("/")
+                if int(d):
+                    return round(int(n) / int(d))
+            except Exception:
+                pass
+    return None
+
+
 def is_on_demand(cam):
     return str(cam.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on")
 
@@ -390,6 +405,16 @@ def check_output(cam):
         return {"status": "warn", "detail": "live" if advancing else "stale",
                 "msg": f"Serving, but a segment didn't probe cleanly: {err}.", "latency": lat}
     copy_ok, label = classify(stream)
+    if lat:
+        fps = stream_fps(stream)
+        if fps:
+            lat["fps"] = fps
+            # In copy mode a segment is cut only on a keyframe, so seg_len IS the camera's
+            # keyframe interval — expose it in *frames* (fps x seconds), the number the camera's
+            # web UI actually asks for, plus the frame count that would give a 1-second interval.
+            if str(cam.get("mode", "transcode")) == "copy":
+                lat["gop"] = round(lat["seg_len"] * fps)
+                lat["gop1s"] = fps
     if not advancing:
         if is_on_demand(cam):
             return {"status": "idle", "detail": "idle",
@@ -843,6 +868,7 @@ INDEX_HTML = r"""<!doctype html>
   .pending { opacity:.6; }
   .detail { font-family:ui-monospace,monospace; font-size:.8rem; opacity:.85; }
   .lat { font-size:.78rem; opacity:.8; margin-top:3px; cursor:help; }
+  .lat2 { display:block; font-size:.74rem; opacity:.85; margin-top:1px; }
   .pline { margin-bottom:12px; }
   .prow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .plabel { font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 9px; border-radius:999px; border:1px solid var(--line); }
@@ -1283,7 +1309,13 @@ function row(k,kind){ return '<div class="res" id="res-'+kind+'"><div class="k">
 function setRes(id,r){ var v=document.getElementById('v-'+id); if(!v) return;
   var h = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>';
   if(r.latency){ var L=r.latency;
-    h += '<div class="lat" title="Alexa starts near the back of the HLS buffer, so this is roughly how far behind real-time the live view sits. Each segment is one keyframe interval in copy mode. Lower it with HLS buffer segments (Configuration → Streaming), or shorten the camera\'s sub-stream keyframe interval to ~1s.">⏱ Alexa live view ≈ '+L.secs+'s behind real-time · '+L.segs+' seg × '+L.seg_len+'s</div>'; }
+    var tip='Alexa starts near the back of the HLS buffer, so this is roughly how far behind real-time the live view sits. Total lag = segment length × segment count. In copy mode each segment is one camera keyframe (I-frame) interval, because ffmpeg only cuts a segment on a keyframe. Cut lag by lowering HLS buffer segments (Configuration → Streaming) and/or shortening the camera\'s sub-stream keyframe interval.';
+    var l1='⏱ Alexa live view ≈ <b>'+L.secs+'s</b> behind real-time · '+L.segs+' seg × '+L.seg_len+'s';
+    var l2='';
+    if(L.gop){ l2='source keyframe every '+L.seg_len+'s ≈ camera <b>I-frame interval '+L.gop+'</b> @ '+L.fps+' fps';
+      if(L.gop1s && L.seg_len>1.2){ l2+=' — set it to <b>'+L.gop1s+'</b> for 1s segments'; } }
+    else if(L.fps){ l2='transcoded output @ '+L.fps+' fps (add-on controls segment length, not the camera)'; }
+    h += '<div class="lat" title="'+esc(tip)+'">'+l1+(l2?'<span class="lat2">'+l2+'</span>':'')+'</div>'; }
   v.innerHTML = h; }
 function setPending(id){ var v=document.getElementById('v-'+id); if(v) v.innerHTML='<span class="pending">checking&hellip;</span>'; }
 async function validateCam(name, force){
