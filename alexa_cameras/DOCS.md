@@ -69,7 +69,7 @@ changes** marker appears by the **Save & apply** button (at the bottom of the fo
 with unsaved edits prompts first, so a half-finished change is never silently lost. Nothing takes
 effect until you **Save & apply**.
 
-![The Configuration tab — set the Home Assistant IP (a private IPv4, not a hostname) and add your cameras. Each camera row takes a Host (direct) or a URL override (e.g. a go2rtc/Frigate restream — Host greys out when a URL is set), plus Mode, an Audio column (none / inject / inject_mix), and an On-demand checkbox; the Audio injection panel below the table holds the control-API token and default TTS engine](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/configuration.png)
+![The Configuration tab — set the RTSP defaults and the Home Assistant IP (a private IPv4, not a hostname), then manage cameras as a read-only summary (each row shows its source / mode / audio / always-on-or-on-demand pills, with Edit and Delete buttons and + Add camera). Below sit the Audio injection panel (control-API token + default TTS engine) and Streaming (advanced) with the global transcode defaults; the Save & apply / View as YAML / Discard changes buttons and a saved/unsaved indicator are at the bottom](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/configuration.png)
 
 ---
 
@@ -124,6 +124,19 @@ for `transcode` cameras — resolution, scale mode, frame rate, bitrate) and an 
 **announcement voice**. Each override field is blank by default and **inherits the global default**
 ([Streaming (advanced)](#streaming-advanced) for streaming, the **Audio injection** panel's TTS engine
 for the voice) unless you set it. No YAML required, though **View as YAML** remains for bulk edits.
+
+The **Advanced** section adapts to the camera's **Mode**: a `transcode` camera exposes the full set of
+streaming overrides (HLS buffer, resolution, scale mode, frame rate, bitrate), while a `copy` camera —
+which keeps its source resolution/fps/bitrate untouched — shows only **HLS buffer segments**, since the
+rest wouldn't apply.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-transcode.png" alt="The Edit camera dialog for a transcode camera — Name, a Direct-camera-IP / Full-RTSP-URL Source toggle, Host, Path override, Mode, Audio, Announcement voice, an On-demand checkbox, and an Advanced section exposing HLS buffer segments, Resolution, Scale mode, Frame rate, and Bitrate cap (each defaulting to 'use global default')" width="49%">
+  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-copy.png" alt="The Edit camera dialog for a copy camera — the same fields, but the Advanced section shows only HLS buffer segments because resolution / scale mode / frame rate / bitrate only apply to transcoded cameras" width="49%">
+</p>
+
+*The Edit dialog for a `transcode` camera (left) vs a `copy` camera (right): the copy camera's Advanced
+section collapses to just the HLS buffer, since the encode settings don't apply to a remux.*
 
 | Field | Required | Description |
 |---|---|---|

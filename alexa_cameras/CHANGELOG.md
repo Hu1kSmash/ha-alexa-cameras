@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.7
+
+- **Refreshed screenshots** to the current UI: **Overview** (with the Advanced column) and
+  **Configuration** (the read-only camera summary + Edit/Delete rows, no longer the old inline table).
+  Added two new shots of the per-camera **Edit** dialog — a `transcode` camera (full Advanced
+  overrides) beside a `copy` camera (Advanced collapses to just the HLS buffer) — and documented that
+  the Advanced section adapts to the camera's Mode. Docs-only.
+
 ## 1.19.6
 
 - **Documentation refresh** to match the recent UI and logging work (no functional change):
