@@ -401,6 +401,39 @@ so its wording changes with your current state:
 > (changing it wouldn't help). Transcoding costs CPU, though; if your sub stream is already H.264
 > Baseline, `copy` + a 1-second camera keyframe interval gives you low latency **and** low CPU.
 
+### Jittery or stuttering video
+
+The latency tuning above has a **flip side worth understanding before you chase a "bug."** An Echo
+Show is a **Wi-Fi** device pulling a **real-time** stream, and a real-time stream carries almost **no
+safety buffer** — that's the whole point of low latency: the player stays only a couple of seconds
+behind live, so unlike Netflix (which buffers minutes ahead and rides out any hiccup) a live camera
+has nothing in reserve. If the Echo's Wi-Fi is weak, or your network is momentarily slow, a segment
+arrives late and you get **stutter, a brief freeze, a flash of black, or a "connecting…" re-buffer.**
+
+**This is almost always the Echo's network link, not the add-on.** The add-on serves the exact same
+segments to every viewer, so the quickest way to prove it is to open the same stream on a **wired**
+computer — the **Served at** link on the Overview tab — while the Echo is stuttering. If the wired
+browser is smooth, the segments are fine and the **Echo's Wi-Fi is the bottleneck.**
+
+Fixes, roughly in order of impact:
+
+1. **Improve the Echo's Wi-Fi** — the big one. A distant Echo on congested 2.4 GHz is the classic
+   cause; move it closer to an access point (or add one nearby), and prefer 5 GHz if the Echo and AP
+   support it. Echoes are Wi-Fi-only, so their radio environment is the lever that matters most.
+2. **Raise the buffer** — the deliberate *opposite* of the latency tuning above. A deeper **HLS buffer
+   segments** (Configuration → Streaming) gives the player more slack to absorb a slow fetch, at the
+   cost of a little more lag. If you dropped it to **2** to cut latency and now see stutter, put it
+   back to **4** (or higher). Smoothness vs. lag is exactly the dial you're trading.
+3. **Feed the low-res *sub* stream, not the main.** A 4K/high-bitrate feed is far more to push over
+   Wi-Fi than an Echo Show can use or display. Point the add-on at the camera's **sub** stream — small
+   and low-bitrate, it looks fine on the little screen and there's simply less to drop. If your sub
+   stream is still high-bitrate, lower its bitrate/resolution in the camera's own settings.
+4. **Reduce network congestion.** Other heavy Wi-Fi users, a saturated internet uplink (Amazon's relay
+   fetches your stream over the WAN), or many cameras transcoding at once can all starve the fetch.
+
+So: **lower the buffer for less lag, raise it for smoother playback** — and if a wired browser is
+smooth while the Echo isn't, spend your effort on the Echo's Wi-Fi, not the add-on.
+
 > ⚠️ **Heads-up about Frigate birdseye — it's an *on-demand, re-encoded* stream, so run it gently.**
 >
 > Birdseye has **two layers**, and it only makes sense once you see both:
@@ -808,6 +841,7 @@ expose it to the internet, and protect it with `inject_token`.
 | Config won't save | **Home Assistant IP** missing or a hostname | Enter the HA server's **private IPv4** (e.g. `192.168.1.100`), not a hostname. |
 | Alexa black, **no `172.x`** in Logs when asked | Stream not reaching the add-on | Look upstream: Cloudflare / WAF / tunnel / Lambda (see the setup guide). |
 | Camera on Alexa **frozen** after an add-on restart/update | Alexa holds the last frame when the HLS stream restarts | Re-show it (*"Alexa, show &lt;camera&gt;"*). Any add-on restart interrupts a live view. |
+| Alexa video **stutters / freezes / flashes black** intermittently (but the stream is up) | The Echo is on **Wi-Fi** pulling a real-time stream with little buffer — usually weak Echo Wi-Fi or a slow/congested network, not the add-on | See [Jittery or stuttering video](#jittery-or-stuttering-video): improve the Echo's Wi-Fi, **raise** HLS buffer segments, and feed the low-res sub stream. Tell-tale: if a **wired** browser plays the same stream smoothly, it's the Echo's link. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
 | **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then leaves it alone while idle (connecting only when watched) and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
 | **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on only connects to it while it's being watched, never churning the encoder. |

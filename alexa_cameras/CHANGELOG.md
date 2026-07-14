@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.3
+
+- Docs: added a **Jittery or stuttering video** section explaining that an Echo Show pulls a
+  real-time stream over Wi-Fi (little buffer), so intermittent stutter/freeze is almost always the
+  Echo's Wi-Fi, not the add-on — with fixes (improve Echo Wi-Fi, *raise* HLS buffer segments, use the
+  low-res sub stream) and the wired-browser tell-tale. Cross-referenced from Troubleshooting and the
+  end-to-end setup guide's latency appendix.
+
 ## 1.16.2
 
 - Docs: refreshed the Configuration screenshot (Streaming panel now at the bottom, per-camera config)

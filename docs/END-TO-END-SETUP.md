@@ -657,6 +657,12 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 5 -f null -
 
 - **~3 seconds** glass-to-glass is the practical floor: Amazon's relay does **not**
   support LL-HLS, so 1-second plain-HLS segments are as low as it goes.
+- **Jittery / stuttering playback is almost always the Echo's Wi-Fi, not the stream.** An Echo Show
+  pulls a real-time stream, which has little buffer to ride out a slow fetch — a weak-signal or
+  congested Echo is the usual cause. Improve the Echo's Wi-Fi, **raise** the add-on's **HLS buffer
+  segments** (Configuration → Streaming), and use the low-res sub stream. Tell-tale: if a **wired**
+  browser plays the same URL smoothly, it's the Echo's link. See
+  [DOCS → Jittery or stuttering video](../alexa_cameras/DOCS.md#jittery-or-stuttering-video).
 - Use each camera's **sub stream** (low-res, low-bitrate) for Alexa — an Echo Show
   is small, and it keeps `copy`-mode CPU near zero. On Amcrest/Dahua, set the sub
   to **H.264B** and use `mode: copy`.
