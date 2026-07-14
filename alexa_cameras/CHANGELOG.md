@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.2
+
+- Camera summary: a camera with any per-camera **Advanced override** (resolution / scale mode / fps /
+  bitrate / buffer) now shows an amber **"Advanced"** pill — hover it to see exactly what's customized —
+  so non-default config isn't hidden behind the editor.
+
 ## 1.19.1
 
 - Configuration tab **highlights unsaved changes**: an **"● Unsaved changes"** badge and a glow on the

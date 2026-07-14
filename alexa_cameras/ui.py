@@ -974,6 +974,7 @@ INDEX_HTML = r"""<!doctype html>
   .camsum .cpill.rst { border-color:#2e9d6e; color:#2e9d6e; }
   .camsum .cpill.aud { border-color:#7c5cff; color:#7c5cff; }
   .camsum .cpill.on { opacity:.5; border-style:dashed; }
+  .camsum .cpill.adv { border-color:#c2760c; color:#c2760c; background:rgba(194,118,12,.13); cursor:help; }
   .camsum .cact { display:flex; gap:6px; margin-left:auto; }
   .camsum .cact button { border:1px solid var(--line); background:transparent; color:inherit; border-radius:7px; padding:4px 11px; cursor:pointer; font-size:.8rem; }
   .camsum .cact button:hover { background:var(--dim); }
@@ -1398,7 +1399,10 @@ function camSummaryRow(c,i){
     '<span class="cpill">'+(c.mode==='copy'?'copy':'transcode')+'</span>';
   if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud" style="cursor:pointer" title="Click to inject a test announcement into this camera (view it on an Echo to hear it)" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio_source)+'</span>';
   pills+= c.on_demand ? '<span class="cpill">on-demand</span>' : '<span class="cpill on">always-on</span>';
-  if(c.mode!=='copy' && c.scale) pills+='<span class="cpill">'+esc(String(c.scale))+'</span>';
+  var adv=[];
+  [['scale','resolution'],['scale_mode','scale mode'],['fps','fps'],['bitrate','bitrate'],['hls_list_size','buffer']].forEach(function(p){
+    if(String(c[p[0]]!=null?c[p[0]]:'').trim()!=='') adv.push(p[1]+'='+c[p[0]]); });
+  if(adv.length) pills+='<span class="cpill adv" title="Custom advanced settings (defaults overridden): '+esc(adv.join(', '))+'">Advanced</span>';
   var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');
   var chg = (JSON.stringify(c) !== ORIGCAMS[c.name||'']) ? ' changed' : '';   // added or modified since last save
   return '<div class="camsum'+chg+'"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
