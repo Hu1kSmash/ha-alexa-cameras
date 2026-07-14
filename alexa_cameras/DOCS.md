@@ -132,8 +132,8 @@ which keeps its source resolution/fps/bitrate untouched — shows only **HLS buf
 rest wouldn't apply.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-transcode.png" alt="The Edit camera dialog for a transcode camera — Name, a Direct-camera-IP / Full-RTSP-URL Source toggle, Host, Path override, Mode, Audio, Announcement voice, an On-demand checkbox, and an Advanced section exposing HLS buffer segments, Resolution, Scale mode, Frame rate, and Bitrate cap (each defaulting to 'use global default')" width="49%">
-  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-copy.png" alt="The Edit camera dialog for a copy camera — the same fields, but the Advanced section shows only HLS buffer segments because resolution / scale mode / frame rate / bitrate only apply to transcoded cameras" width="49%">
+  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-transcode.png" alt="The Edit camera dialog for a transcode camera — Name, a Direct-camera-IP / Full-RTSP-URL Source toggle, Host, Path override, Mode, Audio, Announcement voice, an On-demand checkbox, and an Advanced section exposing HLS buffer segments, Resolution, Scale mode, Frame rate, and Bitrate cap (each defaulting to 'use global default')" height="440">
+  <img src="https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/edit-cam-copy.png" alt="The Edit camera dialog for a copy camera — the same fields, but the Advanced section shows only HLS buffer segments because resolution / scale mode / frame rate / bitrate only apply to transcoded cameras" height="440">
 </p>
 
 *The Edit dialog for a `transcode` camera (left) vs a `copy` camera (right): the copy camera's Advanced

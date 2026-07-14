@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.9
+
+- Docs: the two side-by-side Edit-dialog screenshots now scale to a matching height (they were sized
+  by width, so a small aspect-ratio difference left them slightly uneven).
+
 ## 1.19.8
 
 - Docs typo: fixed a nested-parenthesis in the Cameras section that rendered as
