@@ -24,8 +24,9 @@ instead.
 - **Announce _through_ a camera (experimental)** — mix a spoken TTS announcement into a
   camera's audio track so an Alexa alert plays *over* the live view instead of tearing it
   down. See [DOCS.md](DOCS.md).
-- **Built-in Web UI** — edit config, validate each stream's codec, and check the public
-  URL, all from the add-on's own dashboard (not the Home Assistant *Options* tab).
+- **Built-in Web UI** — edit config (a per-camera editor with validation), validate each
+  stream's codec, read its **live-view latency** and camera I-frame interval, and check the
+  public URL, all from the add-on's own dashboard (not the Home Assistant *Options* tab).
 
 ## Quick start
 

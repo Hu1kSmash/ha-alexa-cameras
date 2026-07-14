@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19.6
+
+- **Documentation refresh** to match the recent UI and logging work (no functional change):
+  - **Logs** section rewritten to show the real current output — the startup **banner**, the masked
+    **configuration summary** (`[diag]` block, safe to paste into a support request), the
+    **timestamped** log/access-log format, the `reloaded` banner on a config save, and the hourly
+    **disk** line.
+  - Documented the per-camera **editor** (read-only summary + Edit dialog), **unsaved-changes**
+    highlighting and the leave-tab prompt, the **advanced** pill on Overview/Validate, per-camera
+    **announcement voice** override, and the observability improvements under *How restarts & logging
+    work*.
+  - Repo README: transcode target noted as tunable; the `:8888` server's on-demand triggering
+    described.
+
 ## 1.19.5
 
 - **Save & apply** now re-emits the startup banner + the full config/diagnostics summary in the log,

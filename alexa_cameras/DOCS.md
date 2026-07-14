@@ -36,8 +36,10 @@ Cameras** item in the Home Assistant sidebar. Its tabs:
 - **Overview** — status (version, camera count, a clickable **Served at** `http://<HA-IP>:8888` link
   to browse the raw served files, the configured **TTS engine** used for audio-injection text, and the
   **HLS buffer** depth) plus a per-camera summary showing **how the add-on read each camera** — the
-  same **On-demand / Mode / Source / Path / Audio** pills as the Validate tab, so you can eyeball your
-  whole setup at a glance without running the live checks.
+  same **On-demand / Mode / Source / Path / Audio / Advanced** pills as the Validate tab, so you can
+  eyeball your whole setup at a glance without running the live checks. (An **advanced** pill flags a
+  camera that has any per-camera override set; the camera's clickable name plays a test announcement
+  through it if audio injection is on.)
 - **[Configuration](#configuration-overview)** — the form / YAML editor (covered next).
 - **[Validate streams](#validate-streams)** — per-camera **Source** + **Output** codec checks.
 - **[Public URL check](#public-url-check)** — compares the **Internal** LAN stream (`:8888`) with
@@ -60,7 +62,12 @@ item in the Home Assistant sidebar, then go to the **Configuration** tab.
   that tab is intentionally empty; everything lives in the Web UI.
 
 The Configuration tab has a **form** with a **View as YAML** toggle — use whichever you
-prefer; they edit the same file.
+prefer; they edit the same file. Cameras are shown as a **read-only summary**; click **Edit** on a
+row (or **+ Add camera**) to open a per-camera dialog with dropdowns and validation (see
+[Cameras](#cameras)). As you change anything, the edited fields **highlight** and an **● Unsaved
+changes** marker appears by the **Save & apply** button (at the bottom of the form); leaving the tab
+with unsaved edits prompts first, so a half-finished change is never silently lost. Nothing takes
+effect until you **Save & apply**.
 
 ![The Configuration tab — set the Home Assistant IP (a private IPv4, not a hostname) and add your cameras. Each camera row takes a Host (direct) or a URL override (e.g. a go2rtc/Frigate restream — Host greys out when a URL is set), plus Mode, an Audio column (none / inject / inject_mix), and an On-demand checkbox; the Audio injection panel below the table holds the control-API token and default TTS engine](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/configuration.png)
 
@@ -113,9 +120,10 @@ full `url` ignores these and uses whatever is in that URL.)
 The **Cameras** panel is a read-only summary — one line per camera. **Click Edit** (or **+ Add
 camera**) to open a dialog where you set everything for that camera with dropdowns and validation:
 the basics below, plus per-camera **Advanced** overrides for the streaming settings (HLS buffer, and —
-for `transcode` cameras — resolution, scale mode, frame rate, bitrate). Each advanced field is blank
-by default and **inherits the global default** ([Streaming (advanced)](#streaming-advanced)) unless you
-set it. No YAML required, though **View as YAML** remains for bulk edits.
+for `transcode` cameras — resolution, scale mode, frame rate, bitrate) and an optional per-camera
+**announcement voice**. Each override field is blank by default and **inherits the global default**
+([Streaming (advanced)](#streaming-advanced) for streaming, the **Audio injection** panel's TTS engine
+for the voice) unless you set it. No YAML required, though **View as YAML** remains for bulk edits.
 
 | Field | Required | Description |
 |---|---|---|
@@ -135,7 +143,7 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 | Field | Required | Description |
 |---|---|---|
 | **Control API token** (`inject_token`) | No (recommended) | A password **you make up** to protect the audio-announcement API (the `POST :8790/say` endpoint that plays sound through a camera). Anything on your network that can reach that endpoint could otherwise play audio through your cameras, so set a long random string here and send the **same** value on every call (HTTP header `X-Inject-Token`, JSON field `token`, or `?token=` in the URL) — a wrong or missing value gets a **403**. This is unrelated to your camera or Home Assistant passwords; you invent it. Leave it blank only for a quick local test. |
-| **Default TTS engine** (`tts_engine`) | No | Which **text-to-speech voice** Home Assistant uses when you send a `{"text": "…"}` announcement and let the add-on speak it. It's the entity ID of a TTS engine you've set up in Home Assistant under **Settings → Voice assistants** — for example `tts.google_en_com`. The Configuration form gives you a **dropdown** of the engines you already have installed, so you don't have to type or guess it. Only needed for the *text* mode of audio injection (not when you play a ready-made audio URL). |
+| **Default TTS engine** (`tts_engine`) | No | Which **text-to-speech voice** Home Assistant uses when you send a `{"text": "…"}` announcement and let the add-on speak it. It's the entity ID of a TTS engine you've set up in Home Assistant under **Settings → Voice assistants** — for example `tts.google_en_com`. The Configuration form gives you a **dropdown** of the engines you already have installed, so you don't have to type or guess it. Only needed for the *text* mode of audio injection (not when you play a ready-made audio URL). Any camera can **override this voice** for its own announcements in its **Edit** dialog (blank = use this default); a `POST /say` can also override it per call with an `engine` field. |
 | `ha_base` *(advanced, YAML only)* | No | Advanced, rarely changed — there's no form field for it. The web address the add-on uses to fetch audio that Home Assistant generates for `{"text": …}` announcements. Defaults to `http://homeassistant:8123` (Home Assistant's internal hostname), which works for almost every install. Only set this if your Home Assistant isn't reachable at that address. |
 
 ### Streaming (advanced)
@@ -529,36 +537,86 @@ so you can compare them against your own output line-for-line.
 
 ### What healthy startup looks like
 
-Right after the add-on starts (or after you save a config change), you'll see each camera worker
-come up. The examples below use the **Example configuration** from earlier — `driveway`
-(direct, `transcode`), `porch` (direct, `copy`), `sideyard`/`garage` (restream, `copy`), and a
-`birdseye` follow-cam (`on_demand`):
+Every log line is stamped with a `[HH:MM:SS]` local time. A start (or a **Save & apply**) opens with
+a banner — a clear visual break so you can always find *where a restart happened* — immediately
+followed by a **configuration summary** that dumps exactly how the add-on read your config
+(passwords and tokens masked, so the whole block is **safe to paste into a support request**). The
+examples below use the **Example configuration** from earlier — `driveway` (direct, `transcode`),
+`porch` (direct, `copy`), `sideyard`/`garage` (restream, `copy`), and a `birdseye` follow-cam
+(`on_demand`):
 
 ```text
-[init] timezone: America/Denver
-Starting camera 'driveway' (192.168.1.200, mode=transcode, audio=inject_mix)
-Starting camera 'porch' (192.168.1.201, mode=copy, audio=inject_mix)
-Starting camera 'sideyard' (rtsp://ccab4aaf-frigate:8554/sideyard_sub, mode=copy, audio=inject_mix)
-Starting camera 'garage' (rtsp://ccab4aaf-frigate:8554/garage_sub, mode=copy, audio=inject_mix)
-Starting camera 'birdseye' (rtsp://ccab4aaf-frigate:8554/birdseye, mode=transcode, audio=inject, on-demand)
-Serving 5 camera(s): /<name>/stream.m3u8 and /<name>/snapshot.jpg on :8888
+████████████████████████████████████████████████████████████████
+   █████╗ ██╗     ███████╗██╗  ██╗ █████╗
+  ██╔══██╗██║     ██╔════╝╚██╗██╔╝██╔══██╗
+  ███████║██║     █████╗   ╚███╔╝ ███████║
+  ██╔══██║██║     ██╔══╝   ██╔██╗ ██╔══██║
+  ██║  ██║███████╗███████╗██╔╝ ██╗██║  ██║
+  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
+        C A M E R A S  (HLS)  —  RTSP → Amazon Echo Show
+        v1.19.5   started 2026-07-13 08:14:01 MDT
+        © 2026 Tom Hirt  ·  github.com/Hu1kSmash/ha-alexa-cameras
+████████████████████████████████████████████████████████████████
+
+[08:14:01] [init] timezone: America/Denver
+[08:14:01] ──── configuration summary (safe to share — passwords/tokens masked) ────
+[08:14:01] version=1.19.5  tz=America/Denver  ffmpeg=6.1.1
+[diag] disk /tmp/hls: 41% used, 120.3G free of 234.0G (holds HLS segments + log)
+[diag] lan_ip=192.168.1.100   ports: hls=8888 inject=8790 ui=8099
+[diag] rtsp defaults: user='admin' port=554 path='/cam/realmonitor?channel=1&subtype=1' password=SET
+[diag] inject_token=SET   tts_engine='tts.google_en_com'   ha_base=(default)
+[diag] streaming defaults: buffer=4 scale=1280x720 mode=fit fps=15 bitrate=uncapped
+[diag] cameras: 5
+[diag]   driveway    transcode  host=192.168.1.200                              audio=inject_mix on_demand=no
+[diag]   porch       copy       host=192.168.1.201                              audio=inject_mix on_demand=no
+[diag]   sideyard    copy       url rtsp://ccab4aaf-frigate:8554/sideyard_sub   audio=inject_mix on_demand=no
+[diag]   garage      copy       url rtsp://ccab4aaf-frigate:8554/garage_sub     audio=inject_mix on_demand=no
+[diag]   birdseye    transcode  url rtsp://ccab4aaf-frigate:8554/birdseye       audio=inject     on_demand=YES  [buf=2]
+[diag] ────────────────────────────────────────────────────────────
+[08:14:01] Starting camera 'driveway' (192.168.1.200, mode=transcode, audio=inject_mix)
+[08:14:01] Starting camera 'porch' (192.168.1.201, mode=copy, audio=inject_mix)
+[08:14:01] Starting camera 'sideyard' (rtsp://ccab4aaf-frigate:8554/sideyard_sub, mode=copy, audio=inject_mix)
+[08:14:01] Starting camera 'garage' (rtsp://ccab4aaf-frigate:8554/garage_sub, mode=copy, audio=inject_mix)
+[08:14:01] Registered on-demand camera 'birdseye' (rtsp://ccab4aaf-frigate:8554/birdseye, mode=transcode, audio=inject) — connects only when watched
+[08:14:01] Serving 5 camera(s): /<name>/stream.m3u8 and /<name>/snapshot.jpg on :8888
 Web UI listening on :8099 (ingress)
-[injector] feeding 'driveway' at /tmp/inject/driveway.pcm
-[injector] feeding 'porch' at /tmp/inject/porch.pcm
-[injector] feeding 'sideyard' at /tmp/inject/sideyard.pcm
-[injector] feeding 'garage' at /tmp/inject/garage.pcm
-[injector] feeding 'birdseye' at /tmp/inject/birdseye.pcm
-[injector] control on :8790  cams=['driveway', 'porch', 'sideyard', 'garage', 'birdseye']
-[init] stall watchdog started (60s threshold)
+[08:14:02] [injector] feeding 'driveway' at /tmp/inject/driveway.pcm
+[08:14:02] [injector] feeding 'porch' at /tmp/inject/porch.pcm
+[08:14:02] [injector] feeding 'sideyard' at /tmp/inject/sideyard.pcm
+[08:14:02] [injector] feeding 'garage' at /tmp/inject/garage.pcm
+[08:14:02] [injector] feeding 'birdseye' at /tmp/inject/birdseye.pcm
+[08:14:02] [injector] control on :8790  cams=['driveway', 'porch', 'sideyard', 'garage', 'birdseye']
+[08:14:02] [init] stall watchdog started (60s threshold)
 [08:14:02] birdseye (on-demand) idle — not connecting until requested
 ```
 
-Each `Starting camera …` line echoes back **exactly** how that camera is configured — its source
-(`host` or `url`), its `mode`, and its `audio_source` — so it's the fastest way to confirm the
-add-on read your config the way you intended. **A healthy always-on worker then goes quiet:** it
-only logs again if it *fails* (ffmpeg logs at `error` level). No news is good news. The last line is
-the new `on_demand` behaviour — `birdseye` isn't being watched, so the add-on isn't connected to it
-at all (see below).
+A few things to read off it:
+
+- The **`[diag]` block** mirrors your config back the way the add-on parsed it — the effective
+  `mode`, source, `audio`, and `on_demand` per camera, plus any per-camera **Advanced overrides** in
+  brackets (here `birdseye` shows `[buf=2]`). It's the fastest way to confirm the add-on read your
+  intent, and it re-prints on every save, so the newest one is always at the bottom of the log.
+- Each **`Starting camera …`** (or **`Registered on-demand camera …`**) line echoes that camera's
+  source, `mode`, and `audio_source`. **A healthy always-on worker then goes quiet** — it only logs
+  again if it *fails* (ffmpeg logs at `error` level). No news is good news.
+- The last line is the `on_demand` behaviour — `birdseye` isn't being watched, so the add-on isn't
+  connected to it at all (see below).
+
+**On a config save,** the same banner + summary re-prints with the word **`reloaded`** (instead of
+`started`) on the version line — a clean marker of exactly when the workers restarted, with the fresh
+config right underneath it:
+
+```text
+        v1.19.5   reloaded 2026-07-13 09:02:18 MDT
+```
+
+Roughly once an hour (and immediately if the disk crosses **90 % full**) the watchdog also logs a
+**disk** line, because when the filesystem fills, camera ffmpeg writes fail with *No space left on
+device* — this tells you before that happens:
+
+```text
+[09:14:03] [disk] 41% used, 120.3G free of 234.0G (holds HLS segments + log)
+```
 
 ### What a camera being viewed looks like (the black-Echo triage)
 
@@ -566,11 +624,11 @@ Every request to `:8888` is logged with the client IP. Ask **"Alexa, show camera
 watch which IP shows up:
 
 ```text
-172.30.32.1 - - [13/Jul/2026 08:20:11] "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
-172.30.32.1 - - [13/Jul/2026 08:20:11] "GET /driveway/seg_00047.ts HTTP/1.1" 200 -
-172.30.32.1 - - [13/Jul/2026 08:20:12] "GET /driveway/seg_00048.ts HTTP/1.1" 200 -
-172.30.32.1 - - [13/Jul/2026 08:20:12] "GET /driveway/snapshot.jpg HTTP/1.1" 200 -
-172.30.32.1 - - [13/Jul/2026 08:20:13] "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
+[08:20:11] 172.30.32.1 "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
+[08:20:11] 172.30.32.1 "GET /driveway/seg_00047.ts HTTP/1.1" 200 -
+[08:20:12] 172.30.32.1 "GET /driveway/seg_00048.ts HTTP/1.1" 200 -
+[08:20:12] 172.30.32.1 "GET /driveway/snapshot.jpg HTTP/1.1" 200 -
+[08:20:13] 172.30.32.1 "GET /driveway/stream.m3u8 HTTP/1.1" 200 -
 ```
 
 - **`172.30.32.1` (or any `172.x`)** = **Amazon's relay reaching the add-on** through your Cloudflare
@@ -592,9 +650,9 @@ it stops again:
 ```text
 [08:14:02] birdseye (on-demand) idle — not connecting until requested
 [08:31:40] birdseye (on-demand) requested — starting stream
-172.30.32.1 - - [13/Jul/2026 08:31:41] "GET /birdseye/stream.m3u8 HTTP/1.1" 404 -
-172.30.32.1 - - [13/Jul/2026 08:32:10] "GET /birdseye/stream.m3u8 HTTP/1.1" 200 -
-172.30.32.1 - - [13/Jul/2026 08:32:10] "GET /birdseye/seg_00001.ts HTTP/1.1" 200 -
+[08:31:41] 172.30.32.1 "GET /birdseye/stream.m3u8 HTTP/1.1" 404 -
+[08:32:10] 172.30.32.1 "GET /birdseye/stream.m3u8 HTTP/1.1" 200 -
+[08:32:10] 172.30.32.1 "GET /birdseye/seg_00001.ts HTTP/1.1" 200 -
 [08:33:35] birdseye (on-demand) unrequested 45s — stopping
 [08:33:40] birdseye (on-demand) idle — not connecting until requested
 ```
@@ -854,6 +912,12 @@ expose it to the internet, and protect it with `inject_token`.
   set Frigate `birdseye.idle_heartbeat_fps: 10` (see the **birdseye** recipe below for why).
 - ffmpeg errors are surfaced into the Logs, each line prefixed with the camera name
   (`[porch] ...`), so you can tell *which* camera is failing and *why*.
+- **The Logs are built for support.** Every line is stamped with local time; each start or save
+  prints a banner (`started` / `reloaded`) so restarts are easy to find, followed by a
+  **configuration summary** with passwords and tokens masked — safe to paste straight into an issue
+  (see [Logs](#logs)). The watchdog also logs **disk** usage hourly (and warns at 90 % full), since a
+  full filesystem is what makes ffmpeg writes fail. The log file self-truncates so it can't grow
+  without bound.
 
 ---
 

@@ -116,6 +116,7 @@ RTSP camera ──► ffmpeg (per camera) ──► /tmp/hls/<name>/*.ts + strea
     into MPEG-TS. Near-zero CPU. Use this whenever you can.
   - **`transcode`** — source is H.265/HEVC (or otherwise incompatible): ffmpeg
     scales to 720p and **encodes H.264 Baseline**. ~0.3–0.5 core per camera.
+    (Resolution / fps / bitrate are tunable, globally or per camera.)
 - **The ffmpeg command** (per camera loop, simplified):
   ```
   ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
@@ -130,7 +131,9 @@ RTSP camera ──► ffmpeg (per camera) ──► /tmp/hls/<name>/*.ts + strea
     -hls_segment_filename /tmp/hls/<name>/seg_%05d.ts /tmp/hls/<name>/stream.m3u8
   ```
 - **Serving:** a tiny Python `http.server` on **:8888** serves
-  `/<name>/stream.m3u8`, the `.ts` segments, and `/<name>/snapshot.jpg`.
+  `/<name>/stream.m3u8`, the `.ts` segments, and `/<name>/snapshot.jpg`. For a camera marked
+  `on_demand`, each request also signals the per-camera worker so an idle source (e.g. Frigate
+  birdseye) is **connected to only while something is actually watching**.
 - **Robustness:** each camera runs in a restart loop with **exponential backoff**
   (3s → 60s) so a wrong password can't hammer a camera into an auth-lockout;
   ffmpeg's stderr is surfaced (per-camera prefixed) into the add-on **Log**.
