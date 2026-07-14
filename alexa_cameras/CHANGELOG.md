@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.8
+
+- Docs typo: fixed a nested-parenthesis in the Cameras section that rendered as
+  `(Streaming (advanced) for streaming …`.
+
 ## 1.19.7
 
 - **Refreshed screenshots** to the current UI: **Overview** (with the Advanced column) and

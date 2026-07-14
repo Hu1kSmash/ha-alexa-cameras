@@ -122,8 +122,9 @@ camera**) to open a dialog where you set everything for that camera with dropdow
 the basics below, plus per-camera **Advanced** overrides for the streaming settings (HLS buffer, and —
 for `transcode` cameras — resolution, scale mode, frame rate, bitrate) and an optional per-camera
 **announcement voice**. Each override field is blank by default and **inherits the global default**
-([Streaming (advanced)](#streaming-advanced) for streaming, the **Audio injection** panel's TTS engine
-for the voice) unless you set it. No YAML required, though **View as YAML** remains for bulk edits.
+unless you set it: streaming settings from the [Streaming (advanced)](#streaming-advanced) panel, the
+voice from the **Audio injection** panel's TTS engine. No YAML required, though **View as YAML** remains
+for bulk edits.
 
 The **Advanced** section adapts to the camera's **Mode**: a `transcode` camera exposes the full set of
 streaming overrides (HLS buffer, resolution, scale mode, frame rate, bitrate), while a `copy` camera —
