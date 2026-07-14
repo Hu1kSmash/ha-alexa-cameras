@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.0
+
+- **Validate streams no longer wakes on-demand cameras.** "Validate all" (and the per-camera
+  Validate) previously probed every camera's source/output — which, for an `on_demand` camera like
+  Frigate **birdseye**, *requested* the stream and briefly woke it. Now on-demand cameras are
+  **skipped** during a normal validation (shown as **Idle — on-demand, not queried**), so nothing
+  pokes the source. Each on-demand card gets a **"Check on-demand stream"** button that runs the live
+  check on purpose when you actually want to test it.
+- **Clearer startup log for on-demand cameras.** Instead of `Starting camera 'birdseye' (rtsp://…)`
+  — which read like a live connection — an on-demand camera now logs
+  `Registered on-demand camera 'birdseye' (…) — connects only when watched`.
+
 ## 1.10.0
 
 - **`on_demand` cameras are now truly lazy — zero source connections while nothing is watching.**

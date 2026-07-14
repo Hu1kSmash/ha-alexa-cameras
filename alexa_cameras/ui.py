@@ -604,13 +604,23 @@ class Handler(BaseHTTPRequestHandler):
         if path == "api/cameras":
             return self._send(200, json.dumps([{
                 "name": c.get("name", ""), "mode": c.get("mode", ""),
+                "on_demand": is_on_demand(c),
                 "source": mask(camera_source(c, cfg))} for c in cams]))
         if path.startswith("api/validate/"):
             name = q.get("cam", [""])[0]
             cam = next((c for c in cams if c.get("name") == name), None)
             kind = path.rsplit("/", 1)[-1]
+            force = q.get("force", ["0"])[0] in ("1", "true", "yes")
             if not cam and kind != "public":
                 return self._send(404, json.dumps({"status": "error", "msg": f"No camera '{name}'."}))
+            # On-demand cameras are skipped during a normal validation — probing them would
+            # wake the source (e.g. Frigate birdseye). The card's "Check on-demand stream"
+            # button passes force=1 to run the live check anyway.
+            if cam and is_on_demand(cam) and not force and kind in ("source", "output"):
+                return self._send(200, json.dumps({
+                    "status": "idle", "detail": "on-demand",
+                    "msg": "On-demand camera — not queried, so its source isn't woken. "
+                           "Use “Check on-demand stream” on this card to test it live."}))
             if kind == "source":
                 return self._send(200, json.dumps(check_source(cam, cfg)))
             if kind == "output":
@@ -1106,10 +1116,14 @@ async function loadLogs(){
 function renderValidate(){
   var list = document.getElementById('list');
   if(!CAMS || !CAMS.length){ list.innerHTML='<p>No cameras configured.</p>'; return; }
-  list.innerHTML = CAMS.map(function(c){ return ''+
-    '<div class="card" data-cam="'+esc(c.name)+'"><div class="row"><span class="name">'+esc(c.name)+'</span>'+
-      '<span class="mode">mode: '+esc(c.mode)+'</span><span style="flex:1"></span>'+
-      '<button onclick="validateCam(\''+esc(c.name)+'\')">Validate</button></div>'+
+  list.innerHTML = CAMS.map(function(c){
+    var btn = c.on_demand
+      ? '<button onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check, which briefly wakes the on-demand source (e.g. Frigate birdseye)">Check on-demand stream</button>'
+      : '<button onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
+    return ''+
+    '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'><div class="row"><span class="name">'+esc(c.name)+'</span>'+
+      '<span class="mode">mode: '+esc(c.mode)+'</span>'+(c.on_demand?'<span class="mode">on-demand</span>':'')+'<span style="flex:1"></span>'+
+      btn+'</div>'+
     '<div class="src2">'+esc(c.source)+'</div><div class="results">'+
       row('Source',c.name+'-source')+row('Output',c.name+'-output')+
     '</div></div>'; }).join('');
@@ -1120,11 +1134,12 @@ function row(k,kind){ return '<div class="res" id="res-'+kind+'"><div class="k">
 function setRes(id,r){ var v=document.getElementById('v-'+id); if(!v) return;
   v.innerHTML = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>'; }
 function setPending(id){ var v=document.getElementById('v-'+id); if(v) v.innerHTML='<span class="pending">checking&hellip;</span>'; }
-async function validateCam(name){
+async function validateCam(name, force){
   showTab('validate');
   var kinds=['source','output'];
+  var qs = force ? '&force=1' : '';
   for(var i=0;i<kinds.length;i++){ setPending(name+'-'+kinds[i]);
-    try { setRes(name+'-'+kinds[i], await (await fetch('api/validate/'+kinds[i]+'?cam='+encodeURIComponent(name))).json()); }
+    try { setRes(name+'-'+kinds[i], await (await fetch('api/validate/'+kinds[i]+'?cam='+encodeURIComponent(name)+qs)).json()); }
     catch(e){ setRes(name+'-'+kinds[i], {status:'error', msg:String(e)}); } }
 }
 async function validateAll(){ var cards=document.querySelectorAll('.card[data-cam]'); for(var i=0;i<cards.length;i++){ await validateCam(cards[i].getAttribute('data-cam')); } }

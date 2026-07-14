@@ -258,7 +258,11 @@ start_workers() {
     if [ "$audio_source" = "inject" ] || [ "$audio_source" = "inject_mix" ]; then
       mkdir -p /tmp/inject && mkfifo -m 600 "/tmp/inject/$name.pcm" 2>/dev/null
     fi
-    echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source}${on_demand:+, on-demand})"
+    if [ "$on_demand" = "1" ]; then
+      echo "Registered on-demand camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source}) — connects only when watched"
+    else
+      echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
+    fi
     hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" & WPIDS+=($!)
     snap_loop "$name" & WPIDS+=($!)
     count=$((count + 1))
