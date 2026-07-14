@@ -307,7 +307,7 @@ Alexa may show black"* — but on a bad `copy` the Source check red-errors first
 **Output** check adds three small rows beneath **Source** / **Output** — what the add-on *detected*,
 the *resulting* lag with the math shown, and (if there's headroom) a *tweak* you can make:
 
-> **Detected** — source keyframe every 2s · camera **I-frame interval 30** @ 15 fps
+> **Detected** — Source keyframe every 2s (camera **I-frame interval 30 frames** ÷ 15 fps = 2s)
 > **Latency** — ⏱ Alexa live view ≈ **8s** behind real-time (4 seg × 2s)
 > **Tune** — Reducing your camera's sub-stream **I-frame interval to 15** (1 keyframe/sec) would shorten segments to ~1s — about 4s of lag. Lowering **HLS buffer segments** cuts it further.
 

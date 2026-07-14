@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.6
+
+- Latency **Detected** row now spells out the arithmetic — *"Source keyframe every 2s (camera I-frame
+  interval 30 frames ÷ 15 fps = 2s)"* — so it's obvious where the segment length comes from.
+
 ## 1.15.5
 
 - Latency **Tune** row: no longer suggests lowering **HLS buffer segments** when it's already at the
