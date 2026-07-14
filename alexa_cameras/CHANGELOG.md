@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.19.0
+
+- **Disk-space monitoring.** The add-on now watches the filesystem holding the HLS segments + log:
+  usage is printed at startup (in the `[diag]` block) and **logged hourly**, and it logs a
+  **WARNING once it crosses 90% full** (rate-limited). So a filling disk is visible in the log
+  *before* camera ffmpeg starts failing with the cryptic "No space left on device."
+
 ## 1.18.7
 
 - Startup **ASCII banner** — a big visual break in the log so add-on restarts stand out at a glance

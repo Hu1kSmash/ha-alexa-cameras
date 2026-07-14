@@ -36,6 +36,11 @@ exec > >(tee -a "$LOG") 2>&1
 # Timestamped, single-line log line for add-on activity (startup, reloads, watchdog, etc.).
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
+# Free space on the filesystem holding the HLS segments + log. Prints "PCT AVAIL SIZE" (e.g.
+# "42 1.2G 2.0G"). If it fills, ffmpeg writes fail with "No space left on device", so we watch it.
+disk_stat() { df -P -h "$HLS" 2>/dev/null | awk 'NR==2 { gsub("%","",$5); print $5, $4, $2 }'; }
+DISK_WARN_PCT=90   # warn in the log when the filesystem is this % full or more
+
 VERSION="$(python3 -c 'import yaml;print(yaml.safe_load(open("/manifest.yaml")).get("version",""))' 2>/dev/null)"
 
 # Big startup banner — a clear visual break in the log so restarts are easy to spot, and it looks neat.
@@ -60,6 +65,7 @@ ART
 print_diag() {
   log "──── configuration summary (safe to share — passwords/tokens masked) ────"
   log "version=${VERSION:-?}  tz=${TZ_NAME:-UTC}  ffmpeg=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')"
+  read -r _dp _da _ds <<< "$(disk_stat)"; [ -n "$_dp" ] && printf '[diag] disk %s: %s%% used, %s free of %s\n' "$HLS" "$_dp" "$_da" "$_ds"
   python3 - <<'PY'
 import re, yaml
 try:
@@ -420,9 +426,23 @@ STALL_SECS=60
 STALL_MAX_RESTARTS=3
 watchdog_loop() {
   local -A seen chg fails warned
-  local now cam m d ondemand
+  local now cam m d ondemand dpct davail dsize last_disk_info=0 last_disk_warn=0
   while true; do
     now=$(date +%s)
+    # Disk watch: /tmp holds the HLS segments + log. Log usage hourly, and warn (rate-limited)
+    # whenever it crosses DISK_WARN_PCT — so a filling disk is visible BEFORE ffmpeg starts
+    # failing with "No space left on device".
+    read -r dpct davail dsize <<< "$(disk_stat)"
+    if [ -n "$dpct" ]; then
+      if [ $(( now - last_disk_info )) -ge 3600 ]; then
+        log "[disk] ${dpct}% used, ${davail} free of ${dsize} (holds HLS segments + log)"
+        last_disk_info=$now
+      fi
+      if [ "$dpct" -ge "$DISK_WARN_PCT" ] && [ $(( now - last_disk_warn )) -ge 600 ]; then
+        log "[disk] WARNING: filesystem ${dpct}% full — only ${davail} free of ${dsize}. When it fills, camera ffmpeg writes FAIL with 'No space left on device'. Free up disk."
+        last_disk_warn=$now
+      fi
+    fi
     # on-demand cameras are EXPECTED to stop producing when idle — never watchdog-restart them.
     ondemand=" $(python3 -c 'import yaml
 try: cams=(yaml.safe_load(open("/data/config.yaml")) or {}).get("cameras",[]) or []
