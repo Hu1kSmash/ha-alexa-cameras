@@ -288,7 +288,7 @@ def source_kind(cam, cfg):
 def path_kind(cam, cfg):
     """For the Validate page: is the RTSP path the shared default, a per-camera override, or in a URL?"""
     if str(cam.get("url", "")).strip():
-        return {"label": "in URL", "why": "the RTSP path is part of the full URL"}
+        return {"label": "default", "why": "no per-camera Path override — the full URL carries its own path"}
     p = str(cam.get("path", "")).strip()
     if p:
         return {"label": "override", "why": "per-camera Path override: " + p}

@@ -259,8 +259,8 @@ spot a camera interpreted differently than the rest. The columns:
 - **Source** — **Direct** (a Host/IP, pulled straight from the camera), **Restream** (green — a URL
   pointing at a *local* restreamer, auto-detected when the host is your `lan_ip`, `localhost`, a
   Frigate/go2rtc hostname, or port `8554`), or **Direct URL** (a full RTSP URL used as-is).
-- **Path** — **default** (the shared *Default RTSP path*), **override** (a per-camera Path), or
-  **in URL** (baked into a full URL).
+- **Path** — **default** (no per-camera override — either the shared *Default RTSP path*, or the
+  path baked into a full URL) or **override** (a per-camera Path).
 - **Audio** — `inject` / `inject_mix`, or `–` if none. **Click a highlighted `inject`/`inject_mix`
   pill to fire a quick test message into that camera's audio** (then view the camera on an Echo to
   hear it) — a fast sanity-check without setting up a `rest_command`.
