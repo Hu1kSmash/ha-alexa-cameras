@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.13
+
+- Docs: document the **output codecs** — every camera is delivered **H.264 + AAC** (48 kHz stereo
+  64 kbps); `transcode` outputs **720p / 15 fps H.264 Baseline**; `copy` passes the video through but
+  still normalizes audio to AAC. Added a Notes bullet and a line in the Mode field.
+
 ## 1.16.12
 
 - Docs: added a screenshot to the "How the Source result is decided" section illustrating an **H.264
