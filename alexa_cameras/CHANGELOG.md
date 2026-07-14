@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.11
+
+- Docs: reframed the birdseye **On-demand** rationale around **efficiency** — don't run the go2rtc
+  `h264_qsv` encoder and the add-on's transcode 24/7 for a stream that's watched only occasionally —
+  rather than "an always-on birdseye will wedge Frigate." Reconnect-churn avoidance is now a secondary
+  bad-day benefit, with a note that an always-on birdseye runs fine in a healthy setup; the real
+  all-cameras-dead wedges remain flaky/overloaded (often wireless) cameras.
+
 ## 1.16.10
 
 - Docs: replaced the old (stale) birdseye Validate screenshot with a current one showing an on-demand
