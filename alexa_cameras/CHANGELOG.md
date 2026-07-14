@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.19.1
+
+- Configuration tab **highlights unsaved changes**: an **"● Unsaved changes"** badge and a glow on the
+  **Save & apply** button appear as soon as you modify anything, each **changed form field** gets an
+  amber left-accent, and any **added/edited camera row** is highlighted in the summary — all cleared on
+  Save & apply (or Discard).
+
 ## 1.19.0
 
 - **Disk-space monitoring.** The add-on now watches the filesystem holding the HLS segments + log:

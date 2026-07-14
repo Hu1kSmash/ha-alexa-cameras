@@ -1001,6 +1001,11 @@ INDEX_HTML = r"""<!doctype html>
   .fld select option { background:Canvas; color:CanvasText; }
   .fld.chk { flex-direction:row; align-items:center; gap:8px; }
   .fld select.dimdefault { opacity:.5; }
+  /* Unsaved-changes cues */
+  .dirtytag { color:#d9822b; font-weight:600; font-size:.85rem; }
+  .primary.needsave { box-shadow:0 0 0 3px rgba(217,130,43,.45); }
+  #cfgform input.changed, #cfgform select.changed { border-color:#d9822b; box-shadow:inset 3px 0 0 #d9822b; }
+  .camsum.changed { border-color:#d9822b; box-shadow:inset 3px 0 0 #d9822b; }
   .card { transition:border-color .12s, background .12s; }
   .card:hover { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.045); }
   .btn-del { border:none; background:transparent; color:#dc2626; font-size:1.05rem; line-height:1; padding:5px 9px; border-radius:8px; cursor:pointer; opacity:.5; }
@@ -1119,9 +1124,10 @@ INDEX_HTML = r"""<!doctype html>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>
     <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
-      <button class="primary" onclick="saveConfig()">Save &amp; apply</button>
+      <button id="cfgsave" class="primary" onclick="saveConfig()">Save &amp; apply</button>
       <button onclick="toggleYaml()"><span id="yamlbtn">View as YAML</span></button>
       <button onclick="discardChanges()">Discard changes</button>
+      <span id="cfgdirty" class="dirtytag" hidden>&#9679; Unsaved changes</span>
       <span id="cfgmsg"></span>
     </div>
   </section>
@@ -1219,8 +1225,18 @@ INDEX_HTML = r"""<!doctype html>
   </section>
 
 <script>
-var CAMS = null, CFG = {cameras:[]}, LANIP = '', yamlMode = false, cfgLoaded = false, logsTimer = null, cfgDirty = false;
-function markDirty(){ cfgDirty = true; }
+var CAMS = null, CFG = {cameras:[]}, LANIP = '', yamlMode = false, cfgLoaded = false, logsTimer = null, cfgDirty = false, ORIGCAMS = {};
+function markDirty(){ cfgDirty = true; updateDirtyUI(); }
+// Baseline the current field values + camera set as "saved", so we can highlight later changes.
+function snapshotForm(){ document.querySelectorAll('#cfgform input, #cfgform select').forEach(function(el){ el.dataset.orig = el.value||''; el.classList.remove('changed'); }); }
+function snapshotCams(){ ORIGCAMS = {}; (CFG.cameras||[]).forEach(function(c){ ORIGCAMS[c.name||''] = JSON.stringify(c); }); }
+function fieldChanged(el){ if(el && el.dataset && el.dataset.orig!==undefined) el.classList.toggle('changed', (el.value||'')!==el.dataset.orig); }
+function updateDirtyUI(){
+  var tag=document.getElementById('cfgdirty'); if(tag) tag.hidden = !cfgDirty;
+  var sv=document.getElementById('cfgsave'); if(sv) sv.classList.toggle('needsave', cfgDirty);
+}
+// Clear all "changed" highlights and re-baseline (call after a load or a successful save).
+function clearDirtyUI(){ cfgDirty=false; snapshotForm(); snapshotCams(); renderCamsSummary(); updateDirtyUI(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 // Camera name becomes the URL path segment (/<name>/stream.m3u8) plus HLS dir + FIFO name,
 // so force it to safe characters live: lowercase letters, numbers, underscore. This stops a
@@ -1287,18 +1303,20 @@ function discardChanges(){
 async function loadConfig(){
   var r; try { r = await (await fetch('api/config')).json(); } catch(e){ r = {data:{cameras:[]}}; }
   CFG = (r && r.data) || {cameras:[]}; if(!CFG.cameras) CFG.cameras=[];
+  snapshotCams();   // baseline cameras before the summary renders
   yamlMode = false;
   document.getElementById('cfgform').hidden = false;
   document.getElementById('cfgyaml').hidden = true;
   document.getElementById('yamlbtn').textContent = 'View as YAML';
   renderForm();
   if(!window._dirtyWired){
-    document.getElementById('cfgform').addEventListener('input', markDirty);
-    document.getElementById('cfgform').addEventListener('change', markDirty);
+    var cf=document.getElementById('cfgform');
+    cf.addEventListener('input', function(e){ markDirty(); fieldChanged(e.target); });
+    cf.addEventListener('change', function(e){ markDirty(); fieldChanged(e.target); });
     var yb=document.getElementById('yamlbox'); if(yb) yb.addEventListener('input', markDirty);
     window._dirtyWired = true;
   }
-  cfgDirty = false;   // freshly loaded == clean
+  cfgDirty = false; updateDirtyUI();   // freshly loaded == clean
   msg('cfgmsg', r && r.error ? '<span class="badge warn">FILE WARNING</span> '+esc(r.error) : '');
 }
 // Resolution presets shared by the global "Transcode defaults" and the per-camera modal.
@@ -1344,6 +1362,7 @@ function renderForm(){
   document.getElementById('f-ip1').value=_oc[0]||''; document.getElementById('f-ip2').value=_oc[1]||'';
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
   renderCamsSummary();
+  snapshotForm();   // baseline field values so later edits highlight
 }
 var TTSENGINES = [];   // cached engine list (fetched once when the config tab loads)
 function ttsOptionsHtml(cur, inherit){
@@ -1381,7 +1400,8 @@ function camSummaryRow(c,i){
   pills+= c.on_demand ? '<span class="cpill">on-demand</span>' : '<span class="cpill on">always-on</span>';
   if(c.mode!=='copy' && c.scale) pills+='<span class="cpill">'+esc(String(c.scale))+'</span>';
   var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');
-  return '<div class="camsum"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
+  var chg = (JSON.stringify(c) !== ORIGCAMS[c.name||'']) ? ' changed' : '';   // added or modified since last save
+  return '<div class="camsum'+chg+'"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
     '<span class="csrc">'+src+'</span>'+
     '<span class="cact"><button onclick="openCamEditor('+i+')">Edit</button>'+
     '<button class="del" onclick="delCam('+i+')" title="remove camera">Delete</button></span></div>';
@@ -1451,8 +1471,10 @@ function saveCamEditor(){
     if(brS!=='') c.bitrate=br; else delete c.bitrate;
   } else { delete c.scale; delete c.scale_mode; delete c.fps; delete c.bitrate; }
   if(!CFG.cameras) CFG.cameras=[];
+  var changed = (CAMIDX<0) || (JSON.stringify(c) !== JSON.stringify(CFG.cameras[CAMIDX]));
   if(CAMIDX>=0) CFG.cameras[CAMIDX]=c; else CFG.cameras.push(c);
-  markDirty(); closeCamEditor(); renderCamsSummary();
+  if(changed) markDirty();
+  closeCamEditor(); renderCamsSummary();
 }
 function delCam(i){
   var nm=(CFG.cameras&&CFG.cameras[i]&&CFG.cameras[i].name)||'this camera';
@@ -1506,7 +1528,7 @@ async function saveConfig(){
   msg('cfgmsg','<span class="pending">saving&hellip;</span>');
   var r; try { r = await (await fetch('api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json(); }
   catch(e){ msg('cfgmsg','<span class="badge error">ERROR</span> '+esc(e)); return; }
-  if(r.ok){ cfgDirty=false; msg('cfgmsg','<span class="badge ok">SAVED</span> applied &mdash; streams restarting'); loadCameras(); }
+  if(r.ok){ clearDirtyUI(); msg('cfgmsg','<span class="badge ok">SAVED</span> applied &mdash; streams restarting'); loadCameras(); }
   else { msg('cfgmsg','<span class="badge error">ERROR</span> '+esc(r.error||'save failed')); }
 }
 
