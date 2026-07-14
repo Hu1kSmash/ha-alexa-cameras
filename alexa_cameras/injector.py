@@ -282,8 +282,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             written = f.enqueue(pcm)
             ms = written * 1000 // BYTES_PER_SEC
-            kind = "test beep" if req.get("test") else ("text" if req.get("text") else "url")
-            print("[%s] [injector] say cam='%s' (%s) -> %dms" % (time.strftime("%H:%M:%S"), cam, kind, ms), flush=True)
+            if req.get("test"):
+                what = "test beep"
+            elif req.get("text"):
+                t = str(req.get("text"))
+                what = 'text "%s"' % (t if len(t) <= 140 else t[:137] + "...")
+            else:
+                what = "url %s" % (req.get("url") or req.get("file"))
+            print("[%s] [injector] say cam='%s' %s (%dms clip)" % (time.strftime("%H:%M:%S"), cam, what, ms), flush=True)
             self._json(200, {"ok": True, "cam": cam, "ms": ms})
         except Exception as e:
             print("[%s] [injector] say cam='%s' FAILED: %s" % (time.strftime("%H:%M:%S"), cam, e), flush=True)

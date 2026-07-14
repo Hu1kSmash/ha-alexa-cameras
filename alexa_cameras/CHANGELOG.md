@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.6
+
+- Logs: the injector now logs the **actual announcement text** (or URL) that was played, e.g.
+  `say cam='frontdriveway' text "A vehicle is approaching the house" (3720ms clip)` — and labels the
+  duration as the clip length.
+
 ## 1.18.5
 
 - Camera editor: trimmed the **Announcement voice** helper text to fit on one line.
