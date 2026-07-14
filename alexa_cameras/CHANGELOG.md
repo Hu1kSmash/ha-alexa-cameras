@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.4
+
+- Diagnostics (🧪) screen reworked into a **support panel**: dropped the keyframe deep-check (now
+  redundant with the Validate latency readout), and added a **system-health header** (version / ffmpeg
+  / disk / memory / load, with disk & memory turning red at ≥90%) plus a per-camera **recent
+  error/event log tail** (HTTP access lines filtered out). The real-time-rate and time-to-first-frame
+  probes stay.
+
 ## 1.19.3
 
 - Pill labels lowercased for consistency: **Source** (`direct` / `restream` / `url`) and the

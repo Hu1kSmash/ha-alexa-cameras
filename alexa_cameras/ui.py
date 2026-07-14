@@ -51,6 +51,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 HLS_PORT = 8888
+HLS_DIR = "/tmp/hls"
 INGRESS_PORT = 8099
 CONFIG = "/data/config.yaml"
 RELOAD = "/tmp/reload"
@@ -727,6 +728,67 @@ def check_firstframe(cam):
             "msg": f"{det} to first frame — slow open. Usually a keyframe-sparse or stalled/on-demand source."}
 
 
+def _human(n):
+    for unit in ("B", "K", "M", "G", "T"):
+        if n < 1024 or unit == "T":
+            return ("%.0f%s" % (n, unit)) if unit in ("B", "K") else ("%.1f%s" % (n, unit))
+        n /= 1024.0
+
+
+def check_errors(cam):
+    """Recent log lines mentioning this camera — the fast 'what's actually failing' view.
+    Skips the :8888 access-log lines (noise) and returns the last handful of events/errors."""
+    name = cam.get("name", "")
+    tag = "[%s]" % name
+    try:
+        lines = open(LOG, errors="replace").read().splitlines()
+    except Exception:
+        return {"status": "warn", "lines": [], "msg": "log not readable"}
+    hits = [ln for ln in lines
+            if '"GET ' not in ln and '"HEAD ' not in ln         # drop HTTP access-log noise
+            and (tag in ln or (name and (" " + name + " ") in (" " + ln + " ")))]
+    hits = hits[-14:]
+    return {"status": "ok" if hits else "idle", "lines": hits,
+            "msg": "" if hits else "no recent log lines for this camera (no news is good news)"}
+
+
+def sysinfo():
+    """System-health snapshot for the diagnostics page: version, ffmpeg, disk (where the HLS
+    segments live), memory, and load average — handy to eyeball when helping someone debug."""
+    out = {}
+    try:
+        out["version"] = yaml.safe_load(open("/manifest.yaml")).get("version", "")
+    except Exception:
+        out["version"] = ""
+    try:
+        out["ffmpeg"] = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True,
+                                       timeout=5).stdout.split()[2]
+    except Exception:
+        out["ffmpeg"] = "?"
+    try:
+        st = os.statvfs(HLS_DIR)
+        total, avail = st.f_blocks * st.f_frsize, st.f_bavail * st.f_frsize
+        out["disk"] = {"path": HLS_DIR, "pct": round((total - avail) * 100.0 / total) if total else 0,
+                       "avail": _human(avail), "size": _human(total)}
+    except Exception:
+        out["disk"] = None
+    try:
+        mem = {}
+        for ln in open("/proc/meminfo"):
+            k, _, v = ln.partition(":")
+            mem[k] = int(v.strip().split()[0]) * 1024
+        total, avail = mem.get("MemTotal", 0), mem.get("MemAvailable", 0)
+        out["mem"] = {"used_pct": round((total - avail) * 100.0 / total) if total else 0,
+                      "avail": _human(avail), "total": _human(total)}
+    except Exception:
+        out["mem"] = None
+    try:
+        out["load"] = open("/proc/loadavg").read().split()[:3]
+    except Exception:
+        out["load"] = None
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # HTTP server
 # --------------------------------------------------------------------------- #
@@ -784,6 +846,8 @@ class Handler(BaseHTTPRequestHandler):
                     "advanced": bool(adv), "advanced_why": ", ".join(adv),
                     "source": mask(camera_source(c, cfg))}
             return self._send(200, json.dumps([cam_info(c) for c in cams]))
+        if path == "api/sysinfo":
+            return self._send(200, json.dumps(sysinfo()))
         if path.startswith("api/validate/"):
             name = q.get("cam", [""])[0]
             cam = next((c for c in cams if c.get("name") == name), None)
@@ -811,6 +875,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(check_keyframe(cam, cfg)))
             if kind == "firstframe":
                 return self._send(200, json.dumps(check_firstframe(cam)))
+            if kind == "errors":
+                return self._send(200, json.dumps(check_errors(cam)))
             if kind == "public":
                 return self._send(200, json.dumps(check_public(q.get("base", [""])[0], name)))
         return self._send(404, json.dumps({"error": "not found"}))
@@ -1028,8 +1094,13 @@ INDEX_HTML = r"""<!doctype html>
   .dbg-cam { margin-bottom:18px; }
   .dbg-cam-head { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
   .dbg-cam-head .name { font-weight:700; font-size:1.05rem; }
-  .dbg-metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .dbg-metrics { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
   @media (max-width:760px){ .dbg-metrics { grid-template-columns:1fr; } }
+  .dbg-sys { font-size:.82rem; opacity:.9; margin-bottom:16px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:rgba(0,0,0,.02); }
+  @media (prefers-color-scheme: dark){ .dbg-sys { background:rgba(255,255,255,.03); } }
+  .dbg-err { margin-top:12px; }
+  .dbg-err-h { font-size:.8rem; font-weight:600; opacity:.75; margin-bottom:5px; }
+  .dbg-err-p { font-family:ui-monospace,monospace; font-size:.74rem; line-height:1.5; white-space:pre-wrap; word-break:break-word; margin:0; padding:9px 11px; border:1px solid var(--line); border-radius:8px; max-height:220px; overflow:auto; opacity:.85; }
   .dbg-metric { border:1px solid rgba(0,0,0,.09); border-left:4px solid #cbd5e1; border-radius:12px; padding:14px; background:rgba(0,0,0,.015); }
   .dbg-metric.ok { border-left-color:#16a34a; }
   .dbg-metric.warn { border-left-color:#d97706; }
@@ -1224,10 +1295,11 @@ INDEX_HTML = r"""<!doctype html>
     <div class="dbg-head">
       <div>
         <h2 style="margin:0">Advanced diagnostics</h2>
-        <p class="sub" style="margin:4px 0 0; max-width:72ch">Deep troubleshooting for a camera that opens <b>slowly</b> or looks <b>choppy</b> on an Echo Show. Each probe samples the live stream for several seconds, so run it only when you need it. Most setups never do &mdash; this is mainly for on-demand sources like an idle Frigate <b>birdseye</b>.</p>
+        <p class="sub" style="margin:4px 0 0; max-width:76ch">Support panel &mdash; for troubleshooting a camera that opens <b>slowly</b>, looks <b>choppy</b>, or won't show. Shows <b>system health</b> (disk / memory / load), and per camera the <b>real-time rate</b>, <b>time-to-first-frame</b>, and the <b>recent error/event log lines</b>. The two probes sample the live stream for several seconds, so run them only when you need to. Most setups never do.</p>
       </div>
       <div class="dbg-actions"><button onclick="showTab('overview')">&larr; Back</button><button class="primary" onclick="runDeepAll()">Run all</button></div>
     </div>
+    <div id="dbgsys" class="dbg-sys">&hellip;</div>
     <div id="dbglist">Loading&hellip;</div>
   </section>
 
@@ -1657,18 +1729,37 @@ async function sayTest(name, el){
 /* ---------- Advanced diagnostics (hidden page) ---------- */
 var DBG_METRICS=[
   ['rate','Real-time output rate','Content produced per wall-second on this add-on\'s HLS output. About <b>1&times;</b> is healthy; well under 1&times; means the stream is falling behind real-time (starved), so Alexa opens it slowly or it stutters.'],
-  ['keyframe','Source keyframe interval','How often the <b>source</b> emits a keyframe. A player can\'t draw a picture until it receives one, so a large gap means a slow first frame. On-demand sources (e.g. an idle Frigate birdseye) are the usual offenders.'],
   ['firstframe','Time to first frame','Wall-clock time to open the served <b>output</b> and decode the first frame &mdash; i.e. <b>how long Alexa waits before the picture appears</b>. Tracks the served keyframe/segment cadence, so lowering a camera\'s keyframe interval shows up here.']
 ];
 function renderDebug(){
   var el=document.getElementById('dbglist');
+  renderSysinfo();
   if(!CAMS || !CAMS.length){ el.innerHTML='<p>No cameras configured.</p>'; return; }
   el.innerHTML = CAMS.map(function(c){ var n=esc(c.name); return ''+
     '<div class="dbg-cam" data-dcam="'+n+'">'+
       '<div class="dbg-cam-head"><span class="name">'+n+'</span><span class="mode">mode: '+esc(c.mode)+'</span>'+
         '<span style="flex:1"></span><button onclick="runDeep(\''+n+'\')">Run deep check</button></div>'+
       '<div class="dbg-metrics">'+ DBG_METRICS.map(function(m){ return metricCard(n,m[0],m[1],m[2]); }).join('') +'</div>'+
+      '<div class="dbg-err" id="dberr-'+n+'"><div class="dbg-err-h">Recent log lines for this camera <span style="opacity:.55;font-weight:400">(errors/events; access-log hidden)</span></div><pre id="dberrp-'+n+'" class="dbg-err-p">Run the deep check to load&hellip;</pre></div>'+
     '</div>'; }).join('');
+}
+function renderSysinfo(){
+  var el=document.getElementById('dbgsys'); if(!el) return;
+  el.innerHTML='<span class="dots">loading system info&hellip;</span>';
+  fetch('api/sysinfo').then(function(r){return r.json();}).then(function(s){
+    function warn(cond,txt){ return cond?'<b style="color:#dc2626">'+txt+'</b>':txt; }
+    var parts=[];
+    parts.push('version '+esc(s.version||'?'));
+    parts.push('ffmpeg '+esc(s.ffmpeg||'?'));
+    if(s.disk) parts.push('disk '+warn(s.disk.pct>=90, s.disk.pct+'% used')+' ('+esc(s.disk.avail)+' free of '+esc(s.disk.size)+')');
+    if(s.mem) parts.push('mem '+warn(s.mem.used_pct>=90, s.mem.used_pct+'% used')+' ('+esc(s.mem.avail)+' free of '+esc(s.mem.total)+')');
+    if(s.load) parts.push('load '+esc(s.load.join(' ')));
+    el.innerHTML=parts.join('  &nbsp;·&nbsp;  ');
+  }).catch(function(){ el.textContent='(system info unavailable)'; });
+}
+function setErrors(name,r){
+  var p=document.getElementById('dberrp-'+name); if(!p) return;
+  p.textContent = (r.lines && r.lines.length) ? r.lines.join('\n') : (r.msg || 'no recent log lines for this camera');
 }
 function metricCard(name,kind,title,desc){
   var id=name+'-'+kind;
@@ -1692,12 +1783,16 @@ function setDeep(id,r){
   var m=document.getElementById('dmm-'+id); if(m) m.textContent=(r.msg||'');
 }
 async function runDeep(name){
-  var kinds=['rate','keyframe','firstframe'];
+  var kinds=['rate','firstframe'];
   kinds.forEach(function(k){ setDeepPending(name+'-'+k); });
+  var ep=document.getElementById('dberrp-'+name); if(ep) ep.textContent='loading…';
   await Promise.all(kinds.map(function(k){
     return fetch('api/validate/'+k+'?cam='+encodeURIComponent(name)).then(function(r){return r.json();})
       .then(function(j){ setDeep(name+'-'+k, j); })
-      .catch(function(e){ setDeep(name+'-'+k, {status:'error', detail:'', msg:String(e)}); }); }));
+      .catch(function(e){ setDeep(name+'-'+k, {status:'error', detail:'', msg:String(e)}); }); })
+    .concat(fetch('api/validate/errors?cam='+encodeURIComponent(name)).then(function(r){return r.json();})
+      .then(function(j){ setErrors(name, j); }).catch(function(){ setErrors(name, {msg:'(couldn\'t read log)'}); })));
+  renderSysinfo();
 }
 async function runDeepAll(){ if(!CAMS) return; for(var i=0;i<CAMS.length;i++){ await runDeep(CAMS[i].name); } }
 /* ---------- Public URL check ---------- */

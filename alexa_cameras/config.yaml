@@ -1,5 +1,5 @@
 name: Alexa Cameras (HLS)
-version: "1.19.3"
+version: "1.19.4"
 slug: alexa_cameras
 description: Serve RTSP cameras to Amazon Echo Show / Alexa as compatible H.264 MPEG-TS HLS.
 url: https://github.com/Hu1kSmash/ha-alexa-cameras/tree/main/alexa_cameras
