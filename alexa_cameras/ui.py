@@ -966,8 +966,9 @@ INDEX_HTML = r"""<!doctype html>
   .pwtoggle:hover { background:var(--dim); }
   /* Cameras: read-only summary list + per-camera modal editor */
   .camlist { display:flex; flex-direction:column; gap:8px; }
-  .camsum { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; flex-wrap:wrap; }
-  .camsum .cname { font-weight:600; font-size:1rem; min-width:100px; }
+  .camsum { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; flex-wrap:wrap; transition:background .12s, border-color .12s; }
+  .camsum:hover { background:rgba(59,130,246,.06); border-color:rgba(59,130,246,.45); }
+  .camsum .cname { font-weight:600; font-size:1rem; flex:0 0 auto; width:var(--cnw, 9ch); }
   .camsum .csrc { font-family:ui-monospace,monospace; font-size:.73rem; opacity:.6; word-break:break-all; flex:1; min-width:150px; }
   .camsum .cpill { font-size:.72rem; padding:2px 10px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; min-width:78px; text-align:center; box-sizing:border-box; }
   .camsum .cpill.rst { border-color:#2e9d6e; color:#2e9d6e; }
@@ -1136,7 +1137,7 @@ INDEX_HTML = r"""<!doctype html>
         </div>
       </div>
       <label class="fld" id="m-host-fld"><span>Host (camera IP)</span><input id="m-host" placeholder="192.168.1.64"></label>
-      <label class="fld" id="m-path-fld"><span>Path <span style="opacity:.55">(optional &mdash; blank uses the shared Default RTSP path)</span></span><input id="m-path" placeholder="/cam/realmonitor?channel=1&amp;subtype=1"></label>
+      <label class="fld" id="m-path-fld"><span>Path override <span style="opacity:.55">(optional &mdash; blank uses the shared Default RTSP path)</span></span><input id="m-path" placeholder="/cam/realmonitor?channel=1&amp;subtype=1"></label>
       <label class="fld" id="m-url-fld"><span>RTSP URL</span><input id="m-url" placeholder="rtsp://user:pass@host:554/stream  or  rtsp://ccab4aaf-frigate:8554/cam_sub"></label>
       <label class="fld"><span>Mode</span>
         <select id="m-mode" onchange="camModeChange()">
@@ -1151,15 +1152,15 @@ INDEX_HTML = r"""<!doctype html>
         </select></label>
       <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(this camera's default TTS engine for <code>{text}</code> injections; blank = global default)</span></span>
         <select id="m-tts"></select></label>
-      <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye); quiets logs, skips the stall watchdog, validates as <i>Idle</i></span></label>
+      <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye)</span></label>
       <div class="adv">
-        <h4>Advanced <span style="opacity:.55;font-weight:400">(blank = use the global default)</span></h4>
-        <label class="fld"><span>HLS buffer segments <span style="opacity:.55">(2&#8211;10; lower = less lag)</span></span><input id="m-buf" type="number" min="2" max="10" placeholder="default"></label>
+        <h4>Advanced</h4>
+        <label class="fld"><span>HLS buffer segments <span style="opacity:.55">(2&#8211;10; lower = less lag)</span></span><input id="m-buf" type="number" min="2" max="10" placeholder="(use global default)"></label>
         <div id="m-transcode-adv">
           <label class="fld"><span>Resolution</span><select id="m-res-sel" onchange="onResSel('m-res-sel','m-res-cust')"></select><input id="m-res-cust" type="text" placeholder="1280x720" style="margin-top:6px;display:none"></label>
-          <label class="fld"><span>Scale mode</span><select id="m-smode"><option value="">(default)</option><option value="fit">Fit &mdash; preserve aspect</option><option value="stretch">Stretch &mdash; fill exactly</option></select></label>
-          <label class="fld"><span>Frame rate (fps)</span><input id="m-fps" type="number" min="5" max="30" placeholder="default"></label>
-          <label class="fld"><span>Bitrate cap (kbps)</span><input id="m-br" type="number" min="200" max="20000" placeholder="uncapped / default"></label>
+          <label class="fld"><span>Scale mode</span><select id="m-smode"><option value="">(use global default)</option><option value="fit">Fit &mdash; preserve aspect</option><option value="stretch">Stretch &mdash; fill exactly</option></select></label>
+          <label class="fld"><span>Frame rate (fps)</span><input id="m-fps" type="number" min="5" max="30" placeholder="(use global default)"></label>
+          <label class="fld"><span>Bitrate cap (kbps)</span><input id="m-br" type="number" min="200" max="20000" placeholder="(use global default)"></label>
         </div>
       </div>
       <div class="modal-err" id="m-err"></div>
@@ -1261,7 +1262,7 @@ async function loadCameras(){
   if(!CAMS || !CAMS.length){ cs.innerHTML = '<p>No cameras yet &mdash; open <b>Configuration</b> to add some.</p>'; }
   else { cs.innerHTML = '<div class="vhead"><span style="flex:1"></span>'+cfgHead()+'</div>'+
     CAMS.map(function(c){ return '<div class="ovcam"><div class="row"><span class="name">'+esc(c.name)+'</span>'+
-      '<span style="flex:1"></span>'+cfgPills(c,false)+'</div><div class="src2">'+esc(c.source)+'</div></div>'; }).join(''); }
+      '<span style="flex:1"></span>'+cfgPills(c,true)+'</div><div class="src2">'+esc(c.source)+'</div></div>'; }).join(''); }
   renderValidate(); renderPublic();
 }
 
@@ -1291,7 +1292,7 @@ async function loadConfig(){
 var RESPRESETS=['1920x1080','1280x720','854x480','640x360','640x480'];
 var RESLABEL={'1920x1080':'1920×1080 (1080p)','1280x720':'1280×720 (720p)','854x480':'854×480 (480p)','640x360':'640×360 (360p)','640x480':'640×480 (VGA 4:3)'};
 function resOpts(includeInherit){
-  var o = includeInherit ? '<option value="">(use default)</option>' : '';
+  var o = includeInherit ? '<option value="">(use global default)</option>' : '';
   RESPRESETS.forEach(function(r){ o+='<option value="'+r+'">'+RESLABEL[r]+'</option>'; });
   return o+'<option value="custom">Custom…</option>';
 }
@@ -1350,7 +1351,9 @@ function maskUrl(u){ return String(u).replace(/(rtsp:\/\/[^:@/]+):[^@/]*@/i,'$1:
 function renderCamsSummary(){
   var el=document.getElementById('camlist'); if(!el) return;
   var cams=CFG.cameras||[];
-  if(!cams.length){ el.innerHTML='<p class="sub" style="margin:0">No cameras yet &mdash; click <b>+ Add camera</b>.</p>'; return; }
+  if(!cams.length){ el.style.removeProperty('--cnw'); el.innerHTML='<p class="sub" style="margin:0">No cameras yet &mdash; click <b>+ Add camera</b>.</p>'; return; }
+  var maxlen=cams.reduce(function(m,c){ return Math.max(m, (((c&&c.name)||'').length)); }, 4);
+  el.style.setProperty('--cnw', (maxlen+2)+'ch');   // name column = longest name, so pills line up
   el.innerHTML=cams.map(camSummaryRow).join('');
 }
 function camSummaryRow(c,i){
@@ -1358,7 +1361,7 @@ function camSummaryRow(c,i){
   var isR = c.url && /:8554\/|frigate|go2rtc|mediamtx|restream/i.test(c.url);
   var pills = (c.url ? '<span class="cpill'+(isR?' rst':'')+'">'+(isR?'Restream':'URL')+'</span>' : '<span class="cpill">Direct</span>')+
     '<span class="cpill">'+(c.mode==='copy'?'copy':'transcode')+'</span>';
-  if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud">'+esc(c.audio_source)+'</span>';
+  if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud" style="cursor:pointer" title="Click to inject a test announcement into this camera (view it on an Echo to hear it)" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio_source)+'</span>';
   pills+= c.on_demand ? '<span class="cpill">on-demand</span>' : '<span class="cpill on">always-on</span>';
   if(c.mode!=='copy' && c.scale) pills+='<span class="cpill">'+esc(String(c.scale))+'</span>';
   var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');

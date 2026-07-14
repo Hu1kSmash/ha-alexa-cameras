@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.18.2
+
+- Camera summary polish: the **name is a fixed column** now, so the pills line up across rows; **hover
+  highlight** is back on each row; and the **audio pill is clickable to fire a test injection** on the
+  Overview and Configuration screens (matching the Validate tab).
+- Camera editor: **Path** → **Path override**; the On-demand line trimmed to one line; the **Advanced**
+  section's redundant "(blank = …)" note removed; and every "inherit the global default" field now
+  shows a consistent greyed **"(use global default)"** placeholder.
+
 ## 1.18.1
 
 - **Per-camera announcement voice** — a camera can now set its own default TTS engine for `{text}`
