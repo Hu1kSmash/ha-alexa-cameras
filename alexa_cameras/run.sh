@@ -55,7 +55,7 @@ banner() {
   ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
 ART
   printf '        C A M E R A S  (HLS)  —  RTSP → Amazon Echo Show\n'
-  printf '        v%s   started %s\n' "${VERSION:-?}" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  printf '        v%s   %s %s\n' "${VERSION:-?}" "${1:-started}" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
   printf '        \302\251 2026 Tom Hirt  \302\267  github.com/Hu1kSmash/ha-alexa-cameras\n'
   printf '████████████████████████████████████████████████████████████████\n\n'
 }
@@ -496,6 +496,10 @@ while true; do
     stop_workers
     start_workers
     pkill -f '/injector.py' 2>/dev/null   # respawns via its loop, re-reading inject cameras
+    # Re-emit the banner + config summary so a save gives a clean visual break in the log
+    # and the latest effective config/diag is always right there to point support at.
+    banner reloaded
+    print_diag
   fi
   # Keep the log file from growing without bound (tee -a re-seeks to EOF).
   [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 2000000 ] && : > "$LOG"

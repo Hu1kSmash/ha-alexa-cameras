@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.5
+
+- **Save & apply** now re-emits the startup banner + the full config/diagnostics summary in the log,
+  not just at boot. Every config save gives a clean visual break marking exactly when workers
+  restarted, followed by the latest effective config — so the newest diag is always right there to
+  point support at. The banner reads `reloaded` (vs `started`) to distinguish a config save from a
+  full add-on restart.
+
 ## 1.19.4
 
 - Diagnostics (🧪) screen reworked into a **support panel**: dropped the keyframe deep-check (now
