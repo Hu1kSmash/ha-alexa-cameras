@@ -99,6 +99,12 @@ full `url` ignores these and uses whatever is in that URL.)
 | **Port** (`rtsp_port`) | No | The network port your cameras use for RTSP. This is almost always **`554`** (the industry standard), so if you've never deliberately changed it, leave it at 554. Only change it if your camera or NVR documentation lists a different RTSP port. |
 | **Default RTSP path** (`default_path`) | No | The last part of the RTSP link — everything after the camera's IP and port — that tells the camera **which** video feed to send. Most cameras offer two: a high-resolution **main** stream and a lower-resolution **sub** stream, and the exact path text differs by brand. This value is used for every camera that doesn't set its own **Path**, so if all your cameras are the same brand you set it once here. The shipped default `/cam/realmonitor?channel=1&subtype=1` is the Amcrest/Dahua **sub-stream** — low-res, which is perfect for the small Echo Show screen and usually already H.264 (so `copy` works). Don't know yours? See the **Finding your camera's RTSP path** section below — you can discover it with VLC or the camera's web page. |
 
+### Streaming (advanced)
+
+| Field | Required | Description |
+|---|---|---|
+| **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s. Leave this blank to use the default of 4. |
+
 ### Home Assistant IP
 
 | Field | Required | Description |

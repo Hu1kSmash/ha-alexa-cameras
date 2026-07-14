@@ -70,6 +70,13 @@ read_config() {
   RUSER="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_user",""))' 2>/dev/null)"
   RPASS="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_password",""))' 2>/dev/null)"
   RPORT="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_port",554))' 2>/dev/null)"
+  # HLS buffer depth (segments in the live playlist). Lower = less lag to real-time but a smaller
+  # buffer that can stall on a slow fetch. Clamped 2-10; default 4.
+  HLS_LIST_SIZE="$(python3 -c 'import yaml
+try: v=int(yaml.safe_load(open("/data/config.yaml")).get("hls_list_size",4))
+except Exception: v=4
+print(max(2,min(10,v)))' 2>/dev/null)"
+  [ -z "$HLS_LIST_SIZE" ] && HLS_LIST_SIZE=4
   # One line per camera: name|host|path|mode|url
   mapfile -t CAMLINES < <(python3 - <<'PY'
 import yaml
@@ -179,7 +186,7 @@ hls_loop() {
     ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
       -rtsp_transport tcp -i "$src" ${ain[@]+"${ain[@]}"} \
       ${amap[@]+"${amap[@]}"} "${venc[@]}" -c:a aac -ar 48000 -ac 2 -b:a 64k \
-      -f hls -hls_time 1 -hls_list_size 4 \
+      -f hls -hls_time 1 -hls_list_size "${HLS_LIST_SIZE:-4}" \
       -hls_flags "delete_segments+omit_endlist+independent_segments" \
       -hls_segment_type mpegts -hls_allow_cache 0 \
       -hls_segment_filename "$HLS/$cam/seg_%05d.ts" "$HLS/$cam/stream.m3u8" \

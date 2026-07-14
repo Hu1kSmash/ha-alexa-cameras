@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.15.0
+
+- **New `hls_list_size` setting (Configuration → Streaming) to tune live-view latency.** It controls
+  how many segments Alexa buffers before playing — Alexa starts near the back of that buffer, so a
+  smaller buffer means the live view sits **closer to real-time**. Default **4**; lower it to **3**
+  or **2** to cut lag (a smaller buffer is less forgiving of a slow fetch, so watch for stutters).
+  Range 2–10. Biggest win is still 1-second keyframes on the camera's sub stream (segments are only
+  cut at source keyframes in `copy` mode).
+
+## 1.14.2
+
+- Validate streams: the Path pill shows **default** (not "in URL") for cameras using a full URL.
+
 ## 1.14.1
 
 - **Fix: a per-camera Path is no longer accepted alongside a URL** (it was silently ignored, which

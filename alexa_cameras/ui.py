@@ -129,6 +129,14 @@ def validate_config(data):
     if not addr.is_private:
         return (f"'{ip}' is not a private/internal IPv4 address. Use the HA server's "
                 "LAN IP (e.g. 192.168.x.x, 10.x.x.x, or 172.16-31.x.x).")
+    hls = data.get("hls_list_size")
+    if hls is not None:
+        try:
+            hv = int(hls)
+        except (TypeError, ValueError):
+            return "hls_list_size must be a whole number between 2 and 10"
+        if not 2 <= hv <= 10:
+            return "hls_list_size must be between 2 and 10 (lower = less lag but a smaller buffer)"
     cams = data.get("cameras")
     if cams is None:
         return "missing 'cameras:' list"
@@ -929,6 +937,12 @@ INDEX_HTML = r"""<!doctype html>
           <label>Default RTSP path<input id="f-path" type="text" placeholder="/cam/realmonitor?channel=1&amp;subtype=1"></label>
         </div>
       </div>
+      <div class="panel"><h2>Streaming (advanced)</h2>
+        <div class="cfg-grid">
+          <label>HLS buffer segments<input id="f-hls-list" type="number" min="2" max="10" placeholder="4"></label>
+        </div>
+        <p class="sub" style="margin:6px 0 0">How many short segments Alexa buffers before playing. <b>Lower = less lag</b> (Alexa starts closer to real&#8209;time), but a smaller buffer can <b>stall</b> on a slow fetch. Default <b>4</b>; try <b>3</b> then <b>2</b> to trim latency, watching for stutters. Each segment is as long as your camera's keyframe interval, so <b>1&#8209;second keyframes</b> on the sub stream are the bigger win.</p>
+      </div>
       <div class="panel"><h2>Home Assistant IP (required)</h2>
         <p class="sub" style="margin:0 0 4px">The Home Assistant server's internal (private) IPv4 address on your LAN &mdash; four numbers, <b>not a hostname</b>.</p>
         <div class="iprow">
@@ -1095,6 +1109,7 @@ function renderForm(){
   document.getElementById('f-pass').value = CFG.rtsp_password || '';
   document.getElementById('f-port').value = CFG.rtsp_port || 554;
   document.getElementById('f-path').value = CFG.default_path || '';
+  document.getElementById('f-hls-list').value = CFG.hls_list_size || '';
   var _it=document.getElementById('f-inject-token'); if(_it) _it.value = CFG.inject_token || '';
   populateTtsEngines();
   var _oc=(CFG.lan_ip||'').split('.');
@@ -1143,6 +1158,7 @@ function gatherForm(){
   if(val('f-pass')) d.rtsp_password = val('f-pass'); else delete d.rtsp_password;
   d.rtsp_port = parseInt(val('f-port')||'554',10);
   if(val('f-path')) d.default_path = val('f-path'); else delete d.default_path;
+  var hls=parseInt(val('f-hls-list'),10); if(hls>=2&&hls<=10&&hls!==4) d.hls_list_size=hls; else delete d.hls_list_size;
   if(val('f-inject-token')) d.inject_token = val('f-inject-token'); else delete d.inject_token;
   if(val('f-tts-engine')) d.tts_engine = val('f-tts-engine'); else delete d.tts_engine;
   var _lan=lanFromFields(); if(_lan) d.lan_ip=_lan; else delete d.lan_ip;
