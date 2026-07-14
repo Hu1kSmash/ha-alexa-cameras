@@ -304,8 +304,9 @@ Alexa may show black"* — but on a bad `copy` the Source check red-errors first
 ### Live-view latency
 
 **Why the live view lags behind real-time — and how to make it snappy.** When a camera is live, the
-**Output** check adds three small rows beneath **Source** / **Output** — what the add-on *detected*,
-the *resulting* lag with the math shown, and (if there's headroom) a *tweak* you can make:
+**Output** check adds four small rows beneath **Source** / **Output** — what the add-on **Detected**
+(segment length, and the camera's I-frame interval that sets it), your current **Buffer** depth, the
+resulting **Latency** with the math shown, and (when there's headroom) a **Tune** step you can take:
 
 > **Detected** — Source keyframe every **2s** (camera I-frame interval 30 frames ÷ 15 fps = 2s)
 > **Buffer** — **4 segments** in the playlist — set under Configuration → Streaming (HLS buffer segments)
@@ -358,6 +359,38 @@ least a couple of segments or the player constantly runs dry and re-buffers; **2
 | **Both** (I-frame 15 **and** 2 segments) | 1.0 s | 2 | **~2 s** |
 
 Re-run Validate after each change and the ⏱ line updates live, so you can dial it in by feel.
+
+**Finding the I-frame interval on your camera.** It lives in the **sub-stream** video-encoding
+settings (the low-res stream the add-on pulls — *not* the main stream), and brands name it
+differently:
+
+| Camera | What the setting is usually called |
+|---|---|
+| Amcrest / Dahua | **I Frame Interval** (in frames), under *Encode → Sub Stream* |
+| Hikvision | **I Frame Interval** (in frames), under *Video → Sub-stream* |
+| Reolink | often fixed in firmware; newer models / ONVIF expose **GOP** or **Max I-Frame Interval** |
+| Generic / ONVIF | **GOP**, **Key Frame Interval**, or **Keyframe Interval** |
+
+Set it to **one keyframe per second** — a frame count equal to the sub-stream's **fps** (the readout
+shows you both numbers, e.g. 15 fps → set **15**). A few cameras express this in **seconds** instead
+of frames; if so, just set **1 second**. If yours only offers coarse presets, pick the smallest that
+gets you near ~1 s. Cameras behind a **go2rtc / Frigate restream** are the same — set it on the
+*camera*; the restreamer just passes the keyframes through, it can't shorten them.
+
+**If the readout doesn't change after you edit the camera:** the add-on reads the new keyframe
+interval only when the stream **reconnects** — save on the camera, then wait a few seconds and re-run
+**Validate** (or restart the add-on). And double-check you changed the **sub** stream, not the main
+one.
+
+**What the Tune row tells you** is context-aware — it only ever names a lever that will actually help,
+so its wording changes with your current state:
+
+| Your state | Tune says |
+|---|---|
+| Segments > 1 s, `copy` source | The exact I-frame frame count to set for 1-second segments, and the resulting lag (plus "lower buffer too" if it's above 2). |
+| Segments already ~1 s, buffer > 2 | Lower **HLS buffer segments** toward 2. |
+| ~1 s segments **and** a 2-segment buffer | *"about as snappy as HLS gets"* — nothing left to do. |
+| `transcode` source | Segment length is the add-on's (~1 s), so it points you at the **buffer**, not the camera. |
 
 > **Transcode mode is different.** When a camera runs `mode: transcode` the add-on re-encodes the
 > video and inserts its **own** keyframes to honor `-hls_time 1`, so segments are ~1 s **regardless of

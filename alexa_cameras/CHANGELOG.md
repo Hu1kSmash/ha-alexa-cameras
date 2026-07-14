@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.15.10
+
+- Docs: rounded out the **Live-view latency** section — corrected the row count (now four:
+  Detected/Buffer/Latency/Tune), added a per-brand guide to **finding the camera's I-frame interval**
+  (Amcrest/Dahua, Hikvision, Reolink, ONVIF; frames-vs-seconds; restream cameras), an "if the readout
+  didn't change after editing the camera" note, and a table of exactly **what the Tune row says in
+  each state**.
+
 ## 1.15.9
 
 - Latency **Tune** row: hardened the advice so it's correct in every state — it only suggests
