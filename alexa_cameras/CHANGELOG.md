@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.18.5
+
+- Camera editor: trimmed the **Announcement voice** helper text to fit on one line.
+
 ## 1.18.4
 
 - Logs: standardized every line to the same **`[HH:MM:SS]`** prefix. The `:8888` access log now reads

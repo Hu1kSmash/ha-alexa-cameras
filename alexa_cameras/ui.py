@@ -1151,7 +1151,7 @@ INDEX_HTML = r"""<!doctype html>
           <option value="inject">inject &mdash; replace audio with announcements</option>
           <option value="inject_mix">inject_mix &mdash; keep audio + overlay announcements</option>
         </select></label>
-      <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(this camera's default TTS engine for <code>{text}</code> injections; blank = global default)</span></span>
+      <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(blank = use the global default)</span></span>
         <select id="m-tts" onchange="dimSel(this)"></select></label>
       <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye)</span></label>
       <div class="adv">
