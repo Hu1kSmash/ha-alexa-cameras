@@ -5,7 +5,7 @@
 # Home Assistant Add-on: Alexa Cameras (HLS)
 
 Serve any RTSP camera to **Amazon Echo Show / Alexa** as a stream Alexa will
-actually play — H.264 Baseline, MPEG-TS HLS, read **directly from the camera**
+actually play — H.264 Baseline, MPEG-TS HLS (HTTP Live Streaming), read **directly from the camera**
 (no go2rtc in the media path, no Nabu Casa). It can also **mix spoken announcements
 into a camera's audio track**, so an alert plays *through* the live camera view on the
 Echo instead of the usual Alexa announcement that tears the view down (see the

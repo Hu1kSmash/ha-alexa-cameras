@@ -3,7 +3,7 @@
 # Alexa Cameras (HLS)
 
 This add-on reads your RTSP cameras and re-serves each one as an
-**Alexa/Echo-compatible HLS stream** (H.264 Baseline, MPEG-TS segments). That's the
+**Alexa/Echo-compatible HLS (HTTP Live Streaming) stream** (H.264 Baseline, MPEG-TS segments). That's the
 one stream format Amazon's camera relay can actually decode — a plain go2rtc/Home
 Assistant HLS feed shows up **black** on an Echo Show because its segments drop the
 in-band SPS/PPS headers. This add-on produces clean, decodable segments instead.

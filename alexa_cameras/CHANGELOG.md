@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.5
+
+- Docs: expand **HLS** to **HLS (HTTP Live Streaming)** on first use in the add-on docs, README, and
+  the end-to-end guide.
+
 ## 1.16.4
 
 - Docs: fixed the example camera `porch` to `mode: copy` in the Option A config and the Logs example
