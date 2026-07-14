@@ -304,12 +304,14 @@ Alexa may show black"* — but on a bad `copy` the Source check red-errors first
 ### Live-view latency
 
 **Why the live view lags behind real-time — and how to make it snappy.** When a camera is live, the
-**Output** check also prints a latency line, e.g.:
+**Output** check adds three small rows beneath **Source** / **Output** — what the add-on *detected*,
+the *resulting* lag with the math shown, and (if there's headroom) a *tweak* you can make:
 
-> ⏱ Alexa live view ≈ **8s** behind real-time · 4 seg × 2.0s
-> source keyframe every 2.0s ≈ camera **I-frame interval 30** @ 15 fps — set it to **15** for 1s segments
+> **Detected** — source keyframe every 2s · camera **I-frame interval 30** @ 15 fps
+> **Latency** — ⏱ Alexa live view ≈ **8s** behind real-time (4 seg × 2s)
+> **Tune** — Reducing your camera's sub-stream **I-frame interval to 15** (1 keyframe/sec) would shorten segments to ~1s — about 4s of lag. Lowering **HLS buffer segments** cuts it further.
 
-Here's the whole model, because it generates a lot of questions:
+Here's the whole model behind those rows, because it generates a lot of questions:
 
 **Alexa plays HLS, and HLS is a rolling buffer of little video files ("segments").** The player
 starts near the **back** of that buffer, so how far behind real-time you are is simply:

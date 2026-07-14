@@ -867,8 +867,10 @@ INDEX_HTML = r"""<!doctype html>
   .idle { background:rgba(59,130,246,.16); color:#2563eb; }
   .pending { opacity:.6; }
   .detail { font-family:ui-monospace,monospace; font-size:.8rem; opacity:.85; }
-  .lat { font-size:.78rem; opacity:.8; margin-top:3px; cursor:help; }
-  .lat2 { display:block; font-size:.74rem; opacity:.85; margin-top:1px; }
+  .latres:not(:empty) { margin-top:8px; padding-left:9px; border-left:2px solid rgba(127,127,127,.3); display:grid; gap:5px; }
+  .res.dbg { font-size:.78rem; }
+  .res.dbg .k { font-weight:500; opacity:.55; }
+  .res.dbg.tweak .v { opacity:.95; }
   .pline { margin-bottom:12px; }
   .prow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .plabel { font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 9px; border-radius:999px; border:1px solid var(--line); }
@@ -1299,7 +1301,7 @@ function renderValidate(){
         '<span style="flex:1"></span>'+cfg+'</div>'+
       '<div class="src2">'+esc(c.source)+'</div><div class="results">'+
         row('Source',c.name+'-source')+row('Output',c.name+'-output')+
-      '</div></div>';
+      '</div><div class="latres" id="lat-'+esc(c.name)+'"></div></div>';
   }).join('');
   list.innerHTML = head + cards;
 }
@@ -1307,23 +1309,39 @@ function badge(s){ return '<span class="badge '+s+'">'+s.toUpperCase()+'</span>'
 function badgeText(s,t){ return '<span class="badge '+s+'">'+esc(t)+'</span>'; }
 function row(k,kind){ return '<div class="res" id="res-'+kind+'"><div class="k">'+k+'</div><div class="v" id="v-'+kind+'"><span class="pending">not checked</span></div></div>'; }
 function setRes(id,r){ var v=document.getElementById('v-'+id); if(!v) return;
-  var h = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>';
-  if(r.latency){ var L=r.latency;
-    var tip='Alexa starts near the back of the HLS buffer, so this is roughly how far behind real-time the live view sits. Total lag = segment length × segment count. In copy mode each segment is one camera keyframe (I-frame) interval, because ffmpeg only cuts a segment on a keyframe. Cut lag by lowering HLS buffer segments (Configuration → Streaming) and/or shortening the camera\'s sub-stream keyframe interval.';
-    var l1='⏱ Alexa live view ≈ <b>'+L.secs+'s</b> behind real-time · '+L.segs+' seg × '+L.seg_len+'s';
-    var l2='';
-    if(L.gop){ l2='source keyframe every '+L.seg_len+'s ≈ camera <b>I-frame interval '+L.gop+'</b> @ '+L.fps+' fps';
-      if(L.gop1s && L.seg_len>1.2){ l2+=' — set it to <b>'+L.gop1s+'</b> for 1s segments'; } }
-    else if(L.fps){ l2='transcoded output @ '+L.fps+' fps (add-on controls segment length, not the camera)'; }
-    h += '<div class="lat" title="'+esc(tip)+'">'+l1+(l2?'<span class="lat2">'+l2+'</span>':'')+'</div>'; }
-  v.innerHTML = h; }
+  v.innerHTML = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>'; }
+function fmtN(x){ if(x==null) return ''; var n=Math.round(x*10)/10; return n%1===0 ? n.toFixed(0) : String(n); }
+function latRow(k,cls,html){ return '<div class="res dbg'+(cls?' '+cls:'')+'"><div class="k">'+k+'</div><div class="v">'+html+'</div></div>'; }
+// Latency block beneath Source/Output: (1) what we detected, (2) the resulting lag with the math
+// shown, (3) an actionable tweak if there's headroom — everything the user needs to tune it alone.
+function setLat(name, L){
+  var el=document.getElementById('lat-'+name); if(!el) return;
+  if(!L || !L.secs){ el.innerHTML=''; return; }
+  var sl=fmtN(L.seg_len), sc=fmtN(L.secs), rows='';
+  if(L.gop){ rows+=latRow('Detected','','source keyframe every '+sl+'s &middot; camera <b>I-frame interval '+L.gop+'</b> @ '+L.fps+' fps'); }
+  else if(L.fps){ rows+=latRow('Detected','','transcoded output @ '+L.fps+' fps &mdash; the add-on sets segment length (~1s), not the camera'); }
+  rows+=latRow('Latency','','&#9201; Alexa live view &asymp; <b>'+sc+'s</b> behind real-time ('+L.segs+' seg &times; '+sl+'s)');
+  var tweak;
+  if(L.gop && L.gop1s && L.seg_len>1.1){
+    tweak='Reducing your camera\'s sub-stream <b>I-frame interval to '+L.gop1s+'</b> (1 keyframe/sec) would shorten segments to ~1s &mdash; about '+fmtN(L.segs)+'s of lag. Lowering <b>HLS buffer segments</b> (Configuration &rarr; Streaming) cuts it further.';
+  } else if(L.segs>2){
+    tweak='Segments are already ~1s. To trim further, lower <b>HLS buffer segments</b> (Configuration &rarr; Streaming) toward 2.';
+  } else {
+    tweak='This is about as snappy as HLS gets &mdash; ~1s segments and a 2-segment buffer.';
+  }
+  rows+=latRow('Tune','tweak',tweak);
+  el.innerHTML=rows;
+}
 function setPending(id){ var v=document.getElementById('v-'+id); if(v) v.innerHTML='<span class="pending">checking&hellip;</span>'; }
 async function validateCam(name, force){
   showTab('validate');
   var kinds=['source','output'];
   var qs = force ? '&force=1' : '';
+  setLat(name, null);
   for(var i=0;i<kinds.length;i++){ setPending(name+'-'+kinds[i]);
-    try { setRes(name+'-'+kinds[i], await (await fetch('api/validate/'+kinds[i]+'?cam='+encodeURIComponent(name)+qs)).json()); }
+    try { var res = await (await fetch('api/validate/'+kinds[i]+'?cam='+encodeURIComponent(name)+qs)).json();
+      setRes(name+'-'+kinds[i], res);
+      if(kinds[i]==='output') setLat(name, res.latency); }
     catch(e){ setRes(name+'-'+kinds[i], {status:'error', msg:String(e)}); } }
 }
 async function validateAll(){ var cards=document.querySelectorAll('.card[data-cam]'); for(var i=0;i<cards.length;i++){ await validateCam(cards[i].getAttribute('data-cam')); } }

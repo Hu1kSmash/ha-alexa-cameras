@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.15.4
+
+- **Latency readout moved into its own rows** beneath **Source** / **Output** on the Validate card, so
+  it no longer crowds the Output result. Three small rows: **Detected** (source keyframe interval,
+  camera I-frame interval, fps — what the add-on sees), **Latency** (⏱ the resulting lag with the
+  `seg × length` math), and **Tune** (a concrete tweak, e.g. drop the camera's I-frame interval to N
+  for ~1s segments, when there's headroom). Everything needed to self-tune, at a glance.
+
 ## 1.15.3
 
 - **The latency readout now exposes the camera's detected I-frame interval** (in *frames* — the exact
