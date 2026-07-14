@@ -248,6 +248,38 @@ def is_on_demand(cam):
     return str(cam.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on")
 
 
+def source_kind(cam, cfg):
+    """Best-effort classification of how a camera is sourced, for the Validate page:
+      - direct   : built from a Host (IP) + the shared RTSP defaults
+      - restream : a URL pointing at a *local* restreamer (go2rtc/Frigate/mediamtx) — one camera
+                   stream is fanned out, so the add-on adds no extra load on the camera itself
+      - url      : a full RTSP URL that isn't recognizably a local restream (pulled as-is)
+    Restream detection keys on things a real camera never is: the HA host's own IP (lan_ip),
+    localhost, a Frigate/go2rtc hostname, or port 8554 (the go2rtc/mediamtx restream port)."""
+    url = str(cam.get("url", "")).strip()
+    host = str(cam.get("host", "")).strip()
+    if url:
+        u = urlparse(url)
+        h = (u.hostname or "").lower()
+        try:
+            port = u.port
+        except ValueError:
+            port = None
+        lan = str(cfg.get("lan_ip", "")).strip().lower()
+        if lan and h == lan:
+            return {"label": "Restream", "why": "URL points at your HA host (lan_ip) — a local restream"}
+        if h in ("127.0.0.1", "localhost", "::1"):
+            return {"label": "Restream", "why": "URL points at localhost — a local restream"}
+        if any(k in h for k in ("frigate", "go2rtc", "mediamtx", "restream")):
+            return {"label": "Restream", "why": f"URL host '{h}' looks like a go2rtc/Frigate restreamer"}
+        if port == 8554:
+            return {"label": "Restream", "why": "URL uses port 8554 (go2rtc/mediamtx restream port)"}
+        return {"label": "Direct URL", "why": "full RTSP URL used as-is (not a recognized local restream)"}
+    if host:
+        return {"label": "Direct", "why": "connects straight to the camera's IP using the RTSP defaults"}
+    return {"label": "—", "why": ""}
+
+
 def check_source(cam, cfg):
     src = camera_source(cam, cfg)
     mode = str(cam.get("mode", "transcode"))
@@ -602,10 +634,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "api/tts_engines":
             return self._send(200, json.dumps(tts_engines()))
         if path == "api/cameras":
-            return self._send(200, json.dumps([{
-                "name": c.get("name", ""), "mode": c.get("mode", ""),
-                "on_demand": is_on_demand(c),
-                "source": mask(camera_source(c, cfg))} for c in cams]))
+            def cam_info(c):
+                sk = source_kind(c, cfg)
+                return {
+                    "name": c.get("name", ""), "mode": c.get("mode", ""),
+                    "audio": str(c.get("audio_source", "")).strip(),
+                    "on_demand": is_on_demand(c),
+                    "source_label": sk["label"], "source_why": sk["why"],
+                    "source": mask(camera_source(c, cfg))}
+            return self._send(200, json.dumps([cam_info(c) for c in cams]))
         if path.startswith("api/validate/"):
             name = q.get("cam", [""])[0]
             cam = next((c for c in cams if c.get("name") == name), None)
@@ -693,6 +730,8 @@ INDEX_HTML = r"""<!doctype html>
   table.cams td.src { font-family:ui-monospace,monospace; font-size:.78rem; opacity:.75; word-break:break-all; }
   table.cams input, table.cams select { width:100%; font:inherit; font-size:.82rem; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
   .mode { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); }
+  .srcb { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); cursor:help; }
+  .srcb.rst { border-color:#2e9d6e; color:#2e9d6e; }
   button.primary { font:inherit; font-weight:600; padding:8px 15px; border-radius:9px; cursor:pointer; border:1px solid #3b82f6; background:#3b82f6; color:#fff; }
   button.primary:hover { background:#2563eb; border-color:#2563eb; }
   button { font:inherit; padding:6px 12px; border-radius:8px; cursor:pointer; border:1px solid var(--line); background:transparent; color:inherit; }
@@ -1120,9 +1159,16 @@ function renderValidate(){
     var btn = c.on_demand
       ? '<button onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check, which briefly wakes the on-demand source (e.g. Frigate birdseye)">Check on-demand stream</button>'
       : '<button onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
+    var tags = '<span class="mode" title="'+(c.mode==='copy'?'Remux only (near-zero CPU) — source is already H.264 Baseline/Main':'Re-encode to H.264 Baseline (uses CPU)')+'">mode: '+esc(c.mode)+'</span>';
+    if(c.source_label && c.source_label!=='—'){
+      var rst = (c.source_label==='Restream');
+      tags += '<span class="srcb'+(rst?' rst':'')+'" title="'+esc(c.source_why||'')+'">'+esc(c.source_label)+'</span>';
+    }
+    if(c.audio){ tags += '<span class="mode" title="Alexa announcements play through this camera\'s audio track (see Audio injection)">audio: '+esc(c.audio)+'</span>'; }
+    if(c.on_demand){ tags += '<span class="mode" title="Connects only while something is watching; skipped by Validate all so it isn\'t woken">on-demand</span>'; }
     return ''+
     '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'><div class="row"><span class="name">'+esc(c.name)+'</span>'+
-      '<span class="mode">mode: '+esc(c.mode)+'</span>'+(c.on_demand?'<span class="mode">on-demand</span>':'')+'<span style="flex:1"></span>'+
+      tags+'<span style="flex:1"></span>'+
       btn+'</div>'+
     '<div class="src2">'+esc(c.source)+'</div><div class="results">'+
       row('Source',c.name+'-source')+row('Output',c.name+'-output')+

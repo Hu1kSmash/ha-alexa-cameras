@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0
+
+- **Validate streams now shows how the add-on reads each camera's config**, so you can eyeball the
+  whole page and confirm everything at a glance. Each card gains badges for **mode** (copy/transcode),
+  **audio** (inject / inject_mix, when set), and **on-demand** — plus a **source type**:
+  - **Direct** — a Host (IP) + the shared RTSP defaults (pulls straight from the camera).
+  - **Restream** (green) — a URL pointing at a *local* restreamer, auto-detected when the host is your
+    `lan_ip`, `localhost`, a Frigate/go2rtc/mediamtx hostname, or port **8554**. Useful confirmation
+    that a camera is fanned out via go2rtc rather than pulled directly. Hover for the reason it matched.
+  - **Direct URL** — a full RTSP URL that isn't a recognized local restream (used as-is).
+
 ## 1.11.1
 
 - **Fix: stale HLS segments no longer pile up in `/tmp`.** On a config-reload worker restart, the
