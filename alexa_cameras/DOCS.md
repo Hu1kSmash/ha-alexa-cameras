@@ -297,6 +297,13 @@ or any other codec — is not decodable by the Echo. The tab compares that again
 | H.264 Baseline/Main | `copy` | 🟢 **OK** | *"Source is H.264 Baseline/Main and mode: copy — ideal."* (lowest CPU) |
 | H.264 Baseline/Main | `transcode` | 🟡 **WARN** | *"Source is already Alexa-ready H.264 — you could switch to mode: copy to save CPU."* |
 
+Row 2 in action — a live camera whose source is **H.264 High** (`h264 High 1280x720`, which Alexa can't
+decode) on `mode: transcode`: the add-on converts it to **H.264 Baseline** and both **Source** and
+**Output** read **OK** (this one happens to be a Frigate birdseye restream, but the same holds for any
+H.265 / H.264-High source):
+
+![Validate streams — an H.264 High source correctly transcoded to H.264 Baseline: Source reads OK ("Source needs transcoding; mode: transcode converts it to H.264 Baseline. Good") and Output is live, decodable H.264 Constrained Baseline](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-streams-h264-high-transcode.png)
+
 The **Source** label also shows exactly what ffprobe found (e.g. `hevc Main 1920x1080 @15fps`), so you
 can see *why* it was flagged. The **Output** check is a second safety net — if what the add-on is
 actually serving on `:8888` isn't H.264 Baseline/Main it warns *"OUTPUT is not H.264 Baseline/Main —

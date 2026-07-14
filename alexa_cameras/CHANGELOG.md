@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.16.12
+
+- Docs: added a screenshot to the "How the Source result is decided" section illustrating an **H.264
+  High source correctly transcoded to H.264 Baseline** (both Source and Output OK) — a concrete example
+  of the transcode row in the codec matrix.
+
 ## 1.16.11
 
 - Docs: reframed the birdseye **On-demand** rationale around **efficiency** — don't run the go2rtc
