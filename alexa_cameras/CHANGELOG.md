@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.10
+
+- Docs: documented that a camera's **`inject` / `inject_mix` audio pill is clickable** anywhere it
+  appears (Overview, Configuration summary, Validate) — a one-click test that speaks a short
+  announcement through that camera, confirmable on an Echo Show or in the **Logs** (every injection is
+  logged). New *Quick test — click the audio pill* section with a screenshot; corrected the Overview
+  bullet (it's the pill that's clickable, not the camera name).
+
 ## 1.19.9
 
 - Docs: the two side-by-side Edit-dialog screenshots now scale to a matching height (they were sized

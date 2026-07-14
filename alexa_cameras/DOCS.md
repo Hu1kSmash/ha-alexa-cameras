@@ -38,8 +38,9 @@ Cameras** item in the Home Assistant sidebar. Its tabs:
   **HLS buffer** depth) plus a per-camera summary showing **how the add-on read each camera** — the
   same **On-demand / Mode / Source / Path / Audio / Advanced** pills as the Validate tab, so you can
   eyeball your whole setup at a glance without running the live checks. (An **advanced** pill flags a
-  camera that has any per-camera override set; the camera's clickable name plays a test announcement
-  through it if audio injection is on.)
+  camera that has any per-camera override set; a camera's **`inject`/`inject_mix` audio pill is
+  clickable** — click it to fire a test announcement through that camera, see [Audio
+  injection](#audio-injection--announce-through-a-camera-experimental).)
 - **[Configuration](#configuration-overview)** — the form / YAML editor (covered next).
 - **[Validate streams](#validate-streams)** — per-camera **Source** + **Output** codec checks.
 - **[Public URL check](#public-url-check)** — compares the **Internal** LAN stream (`:8888`) with
@@ -751,6 +752,27 @@ which one). **On CPU:** `inject`/`inject_mix` re-encode only the *audio* (the vi
 copied in `copy` mode), so the overhead is small. But `inject_mix` on *every* camera does add
 a little per-camera work (decode the source audio + mix + re-encode), so it's not quite the
 near-zero of plain `copy` — negligible for a handful of cameras, worth knowing at scale.
+
+### Quick test — click the audio pill
+
+Anywhere a camera's audio pill appears in the Web UI — the **Overview** list, the **Configuration**
+camera summary, and the **Validate streams** cards — that **`inject` / `inject_mix`** pill is a
+**one-click test button**:
+
+![The clickable inject and inject_mix audio pills](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/inject-audio.png)
+
+Click it and the add-on speaks a short *"Audio injection test on the &lt;name&gt; camera."* into that
+camera's stream (using the camera's [announcement voice](#cameras), or the global default); the pill
+briefly flips to **sent ✓**. It's the fastest way to check injection — and a per-camera voice — works,
+with **no token or `rest_command` needed**. Two ways to confirm it landed:
+
+- **View that camera on an Echo Show** as you click — you'll hear the announcement over the live view.
+  (Audio only plays while the camera is actually being shown.)
+- **Open the Logs tab** — every injection is logged, so you can verify it fired even without an Echo in
+  hand:
+  ```text
+  [18:19:38] [injector] say cam='porch' text "Audio injection test on the porch camera." (3936ms clip)
+  ```
 
 ```yaml
 cameras:
