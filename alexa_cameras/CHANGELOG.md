@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.2
+
+- Docs: refreshed the Configuration screenshot (Streaming panel now at the bottom, per-camera config)
+  and renamed it `config-tab.png` → `configuration.png`.
+
 ## 1.16.1
 
 - Removed the **Validate all streams** button from the Overview tab (the Validate tab has its own
