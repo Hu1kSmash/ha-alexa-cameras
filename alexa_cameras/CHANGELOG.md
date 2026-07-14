@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.11
+
+- Overview → Status now also shows the configured **TTS engine** (used for audio-injection text) and
+  the **HLS buffer** depth (`hls_list_size`, default 4), so both are visible at a glance without
+  opening Configuration.
+
 ## 1.15.10
 
 - Docs: rounded out the **Live-view latency** section — corrected the row count (now four:

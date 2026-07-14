@@ -1115,13 +1115,19 @@ function showTab(t){
 /* ---------- Overview ---------- */
 async function loadCameras(){
   try { CAMS = await (await fetch('api/cameras')).json(); } catch(e){ CAMS = []; }
-  try { var cf = await (await fetch('api/config')).json(); LANIP = (cf.data && cf.data.lan_ip) || ''; } catch(e){}
+  var cfg = {};
+  try { var cf = await (await fetch('api/config')).json(); cfg = (cf && cf.data) || {}; } catch(e){}
+  LANIP = cfg.lan_ip || '';
   var st = document.getElementById('status');
   var srv = 'http://'+(LANIP||location.hostname)+':8888';
+  var tts = cfg.tts_engine ? esc(String(cfg.tts_engine)) : '<span style="opacity:.55">not set</span>';
+  var hls = (cfg.hls_list_size===undefined||cfg.hls_list_size===null||cfg.hls_list_size==='') ? 4 : cfg.hls_list_size;
   st.innerHTML =
     '<div class="k">Version</div><div>__VERSION__</div>'+
     '<div class="k">Cameras</div><div>'+(CAMS?CAMS.length:'…')+'</div>'+
-    '<div class="k">Served at</div><div><a href="'+srv+'" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none">'+srv+'</a> <span style="opacity:.55">&mdash; browse what is being served (new tab)</span></div>';
+    '<div class="k">Served at</div><div><a href="'+srv+'" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none">'+srv+'</a> <span style="opacity:.55">&mdash; browse what is being served (new tab)</span></div>'+
+    '<div class="k">TTS engine</div><div>'+tts+' <span style="opacity:.55">&mdash; for audio-injection text</span></div>'+
+    '<div class="k">HLS buffer</div><div>'+hls+' segment'+(hls==1?'':'s')+' <span style="opacity:.55">&mdash; live-view buffer depth</span></div>';
   var cs = document.getElementById('camsummary');
   if(!CAMS || !CAMS.length){ cs.innerHTML = '<p>No cameras yet &mdash; open <b>Configuration</b> to add some.</p>'; }
   else { cs.innerHTML = '<table class="cams"><thead><tr><th>Name</th><th>Mode</th><th>Source</th></tr></thead><tbody>'+

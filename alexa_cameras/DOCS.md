@@ -33,8 +33,9 @@ Each camera you configure is served on the add-on's port **8888** at:
 Everything is done from the add-on's own dashboard — click **Open Web UI**, or use the **Alexa
 Cameras** item in the Home Assistant sidebar. Its tabs:
 
-- **Overview** — status, a clickable **Served at** `http://<HA-IP>:8888` link (browse the raw
-  served files), and a summary of your cameras.
+- **Overview** — status (version, camera count, a clickable **Served at** `http://<HA-IP>:8888` link
+  to browse the raw served files, the configured **TTS engine** used for audio-injection text, and the
+  **HLS buffer** depth) and a summary of your cameras.
 - **[Configuration](#configuration-overview)** — the form / YAML editor (covered next).
 - **[Validate streams](#validate-streams)** — per-camera **Source** + **Output** codec checks.
 - **[Public URL check](#public-url-check)** — compares the **Internal** LAN stream (`:8888`) with
