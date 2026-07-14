@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.9
+
+- Docs: correct the "wedged Frigate" diagnosis to match what's actually observed — a flaky/overloaded
+  (often wireless) camera spewing corrupt recording segments into a *"Too many unprocessed recording
+  segments"* backlog is the usual cause of the all-cameras-dead cascade; a churned birdseye encoder is
+  a secondary possibility, not the primary. Fix is still: restart Frigate, then address the root cause.
+
 ## 1.16.8
 
 - Docs: drop a redundant transition sentence in the Live-view latency section.

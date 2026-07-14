@@ -462,8 +462,11 @@ smooth while the Echo isn't, spend your effort on the Echo's Wi-Fi, not the add-
 > - **Idle on birdseye** = normal (the encoder is paused). On-demand cameras validate as **Idle**
 >   (skipped so they aren't woken); use **Check on-demand stream** to poke it deliberately.
 > - A **persistent `404` that stays down even while Frigate is clearly tracking activity** — *and* your
->   detection / browser-mod popups / automations have gone dead too — is **not** normal idle. That's a
->   **wedged Frigate encoder**; restart the **Frigate** add-on to clear it (see Troubleshooting below).
+>   detection / browser-mod popups / automations have gone dead too — is **not** normal idle: **Frigate's
+>   pipeline has wedged.** Most often that's a flaky or overloaded camera (frequently a **wireless** one)
+>   spewing **corrupt recording segments** into a *"Too many unprocessed recording segments"* backlog
+>   that stalls everything; a churned on-demand birdseye encoder can do the same. Restart the **Frigate**
+>   add-on to clear it (see Troubleshooting below).
 >
 > (On a *normal, always-on* camera — not on-demand — red/amber here is always a real problem worth chasing.)
 
@@ -839,7 +842,7 @@ expose it to the internet, and protect it with `inject_token`.
 | Alexa video **stutters / freezes / flashes black** intermittently (but the stream is up) | The Echo is on **Wi-Fi** pulling a real-time stream with little buffer — usually weak Echo Wi-Fi or a slow/congested network, not the add-on | See [Jittery or stuttering video](#jittery-or-stuttering-video): improve the Echo's Wi-Fi, **raise** HLS buffer segments, and feed the low-res sub stream. Tell-tale: if a **wired** browser plays the same stream smoothly, it's the Echo's link. |
 | `[watchdog] <cam> … frozen → restarting` in Logs | That camera's stream stalled (frozen mux) and was auto-recovered | Usually self-heals. If it logs *"giving up after 3 restarts"*, investigate that camera/source. |
 | **Frigate birdseye** shows `404` / Source-timeout / Output "not advancing" **while idle** | Normal — birdseye's go2rtc encoder pauses when nothing's consuming it (idle birdseye is just the logo) | **Tick On-demand** on the birdseye camera: the add-on then leaves it alone while idle (connecting only when watched) and reads it as **Idle** instead of an error. Viewing *does* wake the encoder (~30 s cold-start, so a first *"show birdseye"* may time out and a retry works). |
-| **Birdseye `404` that won't recover even *during* real activity** — and detection / browser-mod popups / automations have all gone dead too | Frigate's on-demand `h264_qsv` encoder has **wedged** (inference still runs, but no events or streams are produced) — often from something hammering the birdseye restream | **Restart the Frigate add-on** — it resets the encoder and flushes the recording backlog. Prevent recurrence by ticking **On-demand** on birdseye so the add-on only connects to it while it's being watched, never churning the encoder. |
+| **Cameras `404` / detection / browser-mod popups / automations all go dead together** (not just birdseye idle) | Frigate's detect/record pipeline has **wedged** — usually a flaky or overloaded camera (often a **wireless** one) producing **corrupt recording segments** → a *"Too many unprocessed recording segments"* backlog that stalls everything; a churned on-demand birdseye `h264_qsv` encoder can cause the same | **Restart the Frigate add-on** to flush the backlog (inference keeps running, but no events/streams are produced until you do). Then fix the root cause: sort out the flaky camera's link (Wi-Fi signal / AP), and tick **On-demand** on birdseye so the add-on never churns its encoder. |
 | **Audio injection:** nothing heard | Camera isn't being **viewed**, or `audio_source` not set | Audio only plays while the camera is shown on an Echo; set the camera's **Audio** to `inject`/`inject_mix` (`inject_mix` needs the source to *have* audio). |
 | **Audio injection:** `POST /say` → **403** | Missing / wrong token | Send `inject_token` (header `X-Inject-Token`, JSON `token`, or `?token=`). |
 | **Audio injection:** `POST /say` → **400 `no inject camera '<name>'`** | That camera's **Audio** is `none` (or the name is wrong) — nothing is injected, no stream is touched | Set the camera's **Audio** to `inject`/`inject_mix` and **Save & apply** (no add-on restart needed — the injector re-reads its cameras on save). The reply's `cams` list shows which cameras *are* inject-enabled; target one of those (or omit `cam` to use the first). |
