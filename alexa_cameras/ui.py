@@ -1323,12 +1323,16 @@ function setLat(name, L){
   else if(L.fps){ rows+=latRow('Detected','','transcoded output @ '+L.fps+' fps &mdash; the add-on sets segment length (~1s), not the camera'); }
   rows+=latRow('Buffer','','<b>'+L.segs+' segment'+(L.segs==1?'':'s')+'</b> in the playlist &mdash; set under Configuration &rarr; Streaming (HLS buffer segments).');
   rows+=latRow('Latency','','&#9201; Alexa live view &asymp; <b>'+sc+'s</b> behind real-time ('+L.segs+' seg &times; '+sl+'s)');
+  var longSeg=L.seg_len>1.1, deepBuf=L.segs>2;
+  var canKf=L.gop && L.gop1s && longSeg;   // copy source with a >1s keyframe interval we can shorten
   var tweak;
-  if(L.gop && L.gop1s && L.seg_len>1.1){
+  if(canKf){
     tweak='Reducing your camera\'s sub-stream <b>I-frame interval to '+L.gop1s+'</b> (1 keyframe/sec) would shorten segments to ~1s &mdash; about '+fmtN(L.segs)+'s of lag.';
-    if(L.segs>2){ tweak+=' Lowering <b>HLS buffer segments</b> (Configuration &rarr; Streaming) cuts it further.'; }
-  } else if(L.segs>2){
-    tweak='Segments are already ~1s. To trim further, lower <b>HLS buffer segments</b> (Configuration &rarr; Streaming) toward 2.';
+    if(deepBuf){ tweak+=' Lowering <b>HLS buffer segments</b> (Configuration &rarr; Streaming) cuts it further.'; }
+  } else if(deepBuf){
+    tweak='To trim further, lower <b>HLS buffer segments</b> (Configuration &rarr; Streaming) toward 2'+(longSeg?'':' &mdash; segments are already ~1s')+'.';
+  } else if(longSeg){
+    tweak='Buffer is already at the 2-segment floor; segment length ('+sl+'s) is set by the source keyframe interval.';
   } else {
     tweak='This is about as snappy as HLS gets &mdash; ~1s segments and a 2-segment buffer.';
   }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.9
+
+- Latency **Tune** row: hardened the advice so it's correct in every state — it only suggests
+  shortening the camera I-frame interval when segments are actually >1s, only suggests lowering the
+  buffer when it's above the 2-segment floor, and never falsely claims "segments are already ~1s"
+  when they aren't (e.g. a copy source whose fps couldn't be read).
+
 ## 1.15.8
 
 - Latency **Detected** row now bolds the **segment length** (e.g. **2s**) rather than the I-frame
