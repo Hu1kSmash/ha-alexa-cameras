@@ -311,10 +311,7 @@ Alexa may show black"* — but on a bad `copy` the Source check red-errors first
 the camera's I-frame interval that sets it), your current **Buffer** depth, the resulting **Latency**
 with the math shown, and — when there's headroom — a **Tune** step to cut it:
 
-> **Detected** — Source keyframe every **2s** (camera I-frame interval 30 frames ÷ 15 fps = 2s)
-> **Buffer** — **4 segments** in the playlist — set under Configuration → Streaming (HLS buffer segments)
-> **Latency** — ⏱ Alexa live view ≈ **8s** behind real-time (4 seg × 2s)
-> **Tune** — Reducing your camera's sub-stream **I-frame interval to 15** (1 keyframe/sec) would shorten segments to ~1s — about 4s of lag. Lowering **HLS buffer segments** cuts it further.
+![The Output check's latency breakdown for a live camera: Detected (segment length, and the camera I-frame interval that sets it), Buffer (segment count), Latency (the resulting lag with the math shown — e.g. 4 seg × 2s ≈ 8s), and Tune (how to cut it — shorten the camera's I-frame interval and/or lower the HLS buffer)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/stream-output.png)
 
 Here's the whole model behind those rows, because it generates a lot of questions:
 

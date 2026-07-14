@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.7
+
+- Docs: added a screenshot of the Output check's latency breakdown (Detected / Buffer / Latency /
+  Tune) to the Live-view latency section, replacing the hand-typed example.
+
 ## 1.16.6
 
 - Docs: reword the Live-view latency intro to describe what the Output check reports rather than the
