@@ -281,8 +281,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "provide 'text', 'url', or 'test'"})
                 return
             written = f.enqueue(pcm)
-            self._json(200, {"ok": True, "cam": cam, "ms": written * 1000 // BYTES_PER_SEC})
+            ms = written * 1000 // BYTES_PER_SEC
+            kind = "test beep" if req.get("test") else ("text" if req.get("text") else "url")
+            print("[%s] [injector] say cam='%s' (%s) -> %dms" % (time.strftime("%H:%M:%S"), cam, kind, ms), flush=True)
+            self._json(200, {"ok": True, "cam": cam, "ms": ms})
         except Exception as e:
+            print("[%s] [injector] say cam='%s' FAILED: %s" % (time.strftime("%H:%M:%S"), cam, e), flush=True)
             self._json(500, {"error": str(e)})
 
     def log_message(self, *a):

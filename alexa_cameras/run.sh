@@ -33,6 +33,9 @@ mkdir -p "$HLS"
 # Mirror all output to a log file (for the panel's Logs tab) AND stdout (HA log).
 exec > >(tee -a "$LOG") 2>&1
 
+# Timestamped, single-line log line for add-on activity (startup, reloads, watchdog, etc.).
+log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+
 # Use the host's local timezone for all log timestamps. The image ships tzdata, but
 # s6-overlay strips TZ from the service environment (only `docker exec` sessions get it),
 # so the main process would default to UTC. s6 does persist the env as files, so read the
@@ -42,13 +45,13 @@ TZ_NAME="$(cat /run/s6/container_environment/TZ 2>/dev/null || true)"
 if [ -n "$TZ_NAME" ] && [ -e "/usr/share/zoneinfo/$TZ_NAME" ]; then
   export TZ="$TZ_NAME"
   ln -sf "/usr/share/zoneinfo/$TZ_NAME" /etc/localtime 2>/dev/null || true
-  echo "[init] timezone: $TZ_NAME"
+  log "[init] timezone: $TZ_NAME"
 fi
 
 # One-time migration: seed config.yaml from the HA add-on options on first run,
 # so existing installs keep their cameras when upgrading to self-managed config.
 if [ ! -f "$CONFIG" ]; then
-  echo "[init] no $CONFIG yet — seeding it from the add-on options (one-time)"
+  log "[init] no $CONFIG yet — seeding it from the add-on options (one-time)"
   python3 - "$OPTS" "$CONFIG" <<'PY'
 import json, sys, yaml
 try:
@@ -260,15 +263,15 @@ hls_loop() {
     mkdir -p /tmp/ondemand
     while true; do
       if ! req_fresh "$REQ" "$IDLE"; then
-        [ "$parked" = "0" ] && { echo "[$(date +%H:%M:%S)] $cam (on-demand) idle — not connecting until requested"; parked=1; }
+        [ "$parked" = "0" ] && { log "$cam (on-demand) idle — not connecting until requested"; parked=1; }
         sleep 2; continue
       fi
       parked=0
-      echo "[$(date +%H:%M:%S)] $cam (on-demand) requested — starting stream"
+      log "$cam (on-demand) requested — starting stream"
       _run_ffmpeg &
       ff=$!
       while kill -0 "$ff" 2>/dev/null; do
-        req_fresh "$REQ" "$IDLE" || { echo "[$(date +%H:%M:%S)] $cam (on-demand) unrequested ${IDLE}s — stopping"; pkill -f "$HLS/$cam/seg_" 2>/dev/null; break; }
+        req_fresh "$REQ" "$IDLE" || { log "$cam (on-demand) unrequested ${IDLE}s — stopping"; pkill -f "$HLS/$cam/seg_" 2>/dev/null; break; }
         sleep 3
       done
       wait "$ff" 2>/dev/null
@@ -280,7 +283,7 @@ hls_loop() {
         delay=5
       else
         delay=$(( delay * 2 )); [ "$delay" -gt 300 ] && delay=300
-        echo "[$(date +%H:%M:%S)] $cam (on-demand) produced no output — backing off ${delay}s before any retry"
+        log "$cam (on-demand) produced no output — backing off ${delay}s before any retry"
       fi
       sleep "$delay"
     done
@@ -295,7 +298,7 @@ hls_loop() {
     _run_ffmpeg
     ran=$(( $(date +%s) - start ))
     if [ "$ran" -ge 30 ]; then delay=3; else delay=$(( delay * 2 )); [ "$delay" -gt 60 ] && delay=60; fi
-    echo "[$(date +%H:%M:%S)] $cam stream exited after ${ran}s; restarting in ${delay}s"
+    log "$cam stream exited after ${ran}s; restarting in ${delay}s"
     sleep "$delay"
   done
 }
@@ -328,15 +331,15 @@ start_workers() {
       mkdir -p /tmp/inject && mkfifo -m 600 "/tmp/inject/$name.pcm" 2>/dev/null
     fi
     if [ "$on_demand" = "1" ]; then
-      echo "Registered on-demand camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source}) — connects only when watched"
+      log "Registered on-demand camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source}) — connects only when watched"
     else
-      echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
+      log "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
     fi
-    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" "$scale" "$smode" "$fps" "$bitrate" "$cbuf" & WPIDS+=($!)
-    snap_loop "$name" & WPIDS+=($!)
+    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" "$scale" "$smode" "$fps" "$bitrate" "$cbuf" & WPIDS+=($!); disown
+    snap_loop "$name" & WPIDS+=($!); disown   # disown so stopping workers (reload) doesn't spew "Terminated" to the log
     count=$((count + 1))
   done
-  echo "Serving $count camera(s): /<name>/stream.m3u8 and /<name>/snapshot.jpg on :8888"
+  log "Serving $count camera(s): /<name>/stream.m3u8 and /<name>/snapshot.jpg on :8888"
 }
 
 stop_workers() {
@@ -377,12 +380,12 @@ print(" ".join(str(c.get("name","")).strip() for c in cams if str(c.get("on_dema
       elif [ $(( now - ${chg[$cam]:-$now} )) -ge $STALL_SECS ]; then
         if [ "${fails[$cam]:-0}" -lt "$STALL_MAX_RESTARTS" ]; then
           fails[$cam]=$(( ${fails[$cam]:-0} + 1 ))
-          echo "[$(date +%H:%M:%S)] [watchdog] $cam frozen ${STALL_SECS}s+ -> restarting its ffmpeg only (attempt ${fails[$cam]}/${STALL_MAX_RESTARTS})"
+          log "[watchdog] $cam frozen ${STALL_SECS}s+ -> restarting its ffmpeg only (attempt ${fails[$cam]}/${STALL_MAX_RESTARTS})"
           pkill -f "$HLS/$cam/stream.m3u8" 2>/dev/null
           chg[$cam]=$now
         elif [ "${warned[$cam]:-0}" = "0" ]; then
           warned[$cam]=1
-          echo "[$(date +%H:%M:%S)] [watchdog] $cam STILL frozen after ${STALL_MAX_RESTARTS} restarts -> giving up auto-recovery. Check this camera/source; it won't be restarted again until it recovers on its own."
+          log "[watchdog] $cam STILL frozen after ${STALL_MAX_RESTARTS} restarts -> giving up auto-recovery. Check this camera/source; it won't be restarted again until it recovers on its own."
         fi
       fi
     done
@@ -401,16 +404,16 @@ python3 /ui.py &
 # real-time silence + spliced announcements, and serves POST /say on :8790. Kept in
 # its own restart loop and separate from the HLS file server above, so a hiccup here
 # can't take camera serving down.
-( while true; do python3 /injector.py; echo "[injector] exited; restarting in 2s"; sleep 2; done ) &
+( while true; do python3 /injector.py; log "[injector] exited; restarting in 2s"; sleep 2; done ) &
 # Stall watchdog: auto-restart any camera whose playlist freezes (see watchdog_loop).
 watchdog_loop &
-echo "[init] stall watchdog started (${STALL_SECS}s threshold)"
+log "[init] stall watchdog started (${STALL_SECS}s threshold)"
 
 # Reload watcher: the UI touches $RELOAD after saving config.yaml.
 while true; do
   if [ -f "$RELOAD" ]; then
     rm -f "$RELOAD"
-    echo "[reload] configuration changed — restarting camera workers"
+    log "[reload] configuration changed — restarting camera workers"
     stop_workers
     start_workers
     pkill -f '/injector.py' 2>/dev/null   # respawns via its loop, re-reading inject cameras

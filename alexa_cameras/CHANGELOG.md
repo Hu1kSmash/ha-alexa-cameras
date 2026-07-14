@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.18.3
+
+- Camera editor: the **Announcement voice** (and the other "inherit the global default") dropdowns now
+  **grey out** when left on their default option, matching the placeholder inputs.
+- Config tab: the **Save & apply / View as YAML / Discard** buttons moved to the **bottom** of the
+  form; and switching tabs with **unsaved changes now prompts** you first.
+- Logs: **test injections are logged** (the injector logs each `/say`), **all activity is timestamped
+  on one line** (including config reloads), and the stray **"Terminated"** job-control noise that
+  appeared on reload is suppressed (workers are `disown`ed).
+
 ## 1.18.2
 
 - Camera summary polish: the **name is a fixed column** now, so the pills line up across rows; **hover

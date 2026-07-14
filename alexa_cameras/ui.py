@@ -1000,6 +1000,7 @@ INDEX_HTML = r"""<!doctype html>
   .fld input, .fld select { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; }
   .fld select option { background:Canvas; color:CanvasText; }
   .fld.chk { flex-direction:row; align-items:center; gap:8px; }
+  .fld select.dimdefault { opacity:.5; }
   .card { transition:border-color .12s, background .12s; }
   .card:hover { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.045); }
   .btn-del { border:none; background:transparent; color:#dc2626; font-size:1.05rem; line-height:1; padding:5px 9px; border-radius:8px; cursor:pointer; opacity:.5; }
@@ -1066,13 +1067,7 @@ INDEX_HTML = r"""<!doctype html>
   </section>
 
   <section id="tab-config" hidden>
-    <div class="row" style="margin-bottom:10px">
-      <button class="primary" onclick="saveConfig()">Save &amp; apply</button>
-      <button onclick="toggleYaml()"><span id="yamlbtn">View as YAML</span></button>
-      <button onclick="discardChanges()">Discard changes</button>
-      <span id="cfgmsg"></span>
-    </div>
-    <p class="sub">Stored in the add-on's own <code>config.yaml</code> and applied immediately (the camera streams restart). This does <b>not</b> use the Home Assistant add-on options.</p>
+    <p class="sub" style="margin-top:0">Stored in the add-on's own <code>config.yaml</code> and applied immediately (the camera streams restart). This does <b>not</b> use the Home Assistant add-on options.</p>
     <div id="cfgform">
       <div class="panel"><h2>RTSP defaults (used by cameras without a full url)</h2>
         <div class="cfg-grid">
@@ -1123,6 +1118,12 @@ INDEX_HTML = r"""<!doctype html>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>
+    <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+      <button class="primary" onclick="saveConfig()">Save &amp; apply</button>
+      <button onclick="toggleYaml()"><span id="yamlbtn">View as YAML</span></button>
+      <button onclick="discardChanges()">Discard changes</button>
+      <span id="cfgmsg"></span>
+    </div>
   </section>
 
   <div id="cammodal" class="modal-bg" onclick="if(event.target===this)closeCamEditor()">
@@ -1151,14 +1152,14 @@ INDEX_HTML = r"""<!doctype html>
           <option value="inject_mix">inject_mix &mdash; keep audio + overlay announcements</option>
         </select></label>
       <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(this camera's default TTS engine for <code>{text}</code> injections; blank = global default)</span></span>
-        <select id="m-tts"></select></label>
+        <select id="m-tts" onchange="dimSel(this)"></select></label>
       <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye)</span></label>
       <div class="adv">
         <h4>Advanced</h4>
         <label class="fld"><span>HLS buffer segments <span style="opacity:.55">(2&#8211;10; lower = less lag)</span></span><input id="m-buf" type="number" min="2" max="10" placeholder="(use global default)"></label>
         <div id="m-transcode-adv">
           <label class="fld"><span>Resolution</span><select id="m-res-sel" onchange="onResSel('m-res-sel','m-res-cust')"></select><input id="m-res-cust" type="text" placeholder="1280x720" style="margin-top:6px;display:none"></label>
-          <label class="fld"><span>Scale mode</span><select id="m-smode"><option value="">(use global default)</option><option value="fit">Fit &mdash; preserve aspect</option><option value="stretch">Stretch &mdash; fill exactly</option></select></label>
+          <label class="fld"><span>Scale mode</span><select id="m-smode" onchange="dimSel(this)"><option value="">(use global default)</option><option value="fit">Fit &mdash; preserve aspect</option><option value="stretch">Stretch &mdash; fill exactly</option></select></label>
           <label class="fld"><span>Frame rate (fps)</span><input id="m-fps" type="number" min="5" max="30" placeholder="(use global default)"></label>
           <label class="fld"><span>Bitrate cap (kbps)</span><input id="m-br" type="number" min="200" max="20000" placeholder="(use global default)"></label>
         </div>
@@ -1218,7 +1219,8 @@ INDEX_HTML = r"""<!doctype html>
   </section>
 
 <script>
-var CAMS = null, CFG = {cameras:[]}, LANIP = '', yamlMode = false, cfgLoaded = false, logsTimer = null;
+var CAMS = null, CFG = {cameras:[]}, LANIP = '', yamlMode = false, cfgLoaded = false, logsTimer = null, cfgDirty = false;
+function markDirty(){ cfgDirty = true; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 // Camera name becomes the URL path segment (/<name>/stream.m3u8) plus HLS dir + FIFO name,
 // so force it to safe characters live: lowercase letters, numbers, underscore. This stops a
@@ -1234,6 +1236,10 @@ function octetInput(el,nextId){
 }
 function lanFromFields(){ var o=[val('f-ip1'),val('f-ip2'),val('f-ip3'),val('f-ip4')]; return o.some(function(x){return x!=='';}) ? o.join('.') : ''; }
 function showTab(t){
+  // Guard against leaving the Configuration tab with unsaved edits.
+  if(t!=='config' && !document.getElementById('tab-config').hidden && cfgDirty){
+    if(!confirm('You have unsaved configuration changes. Leave without applying them? (Click Cancel to stay and Save & apply.)')) return;
+  }
   ['overview','config','logs','validate','public','debug'].forEach(function(x){ document.getElementById('tab-'+x).hidden = (x!==t); });
   document.querySelectorAll('.tab').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===t); });
   if(t==='debug'){ renderDebug(); }
@@ -1286,6 +1292,13 @@ async function loadConfig(){
   document.getElementById('cfgyaml').hidden = true;
   document.getElementById('yamlbtn').textContent = 'View as YAML';
   renderForm();
+  if(!window._dirtyWired){
+    document.getElementById('cfgform').addEventListener('input', markDirty);
+    document.getElementById('cfgform').addEventListener('change', markDirty);
+    var yb=document.getElementById('yamlbox'); if(yb) yb.addEventListener('input', markDirty);
+    window._dirtyWired = true;
+  }
+  cfgDirty = false;   // freshly loaded == clean
   msg('cfgmsg', r && r.error ? '<span class="badge warn">FILE WARNING</span> '+esc(r.error) : '');
 }
 // Resolution presets shared by the global "Transcode defaults" and the per-camera modal.
@@ -1308,9 +1321,12 @@ function getResField(selId,custId){
   return sel.value; // '' (inherit) or a preset
 }
 function onResSel(selId,custId){
-  var cust=document.getElementById(custId), isc=document.getElementById(selId).value==='custom';
+  var sel=document.getElementById(selId), cust=document.getElementById(custId), isc=sel.value==='custom';
   cust.style.display = isc ? '' : 'none'; if(isc) cust.focus();
+  dimSel(sel);
 }
+// Grey out a select when it's on its "(use global default)"/empty option, like a placeholder.
+function dimSel(el){ if(el) el.classList.toggle('dimdefault', (el.value||'')===''); }
 function renderForm(){
   document.getElementById('f-user').value = CFG.rtsp_user || '';
   document.getElementById('f-pass').value = CFG.rtsp_password || '';
@@ -1387,6 +1403,7 @@ function openCamEditor(i){
   mget('m-fps').value=c.fps||''; mget('m-br').value=c.bitrate||'';
   mget('m-err').textContent='';
   camSrcType(c.url ? 'url' : 'host'); camModeChange(); camAudioChange();
+  dimSel(mget('m-tts')); dimSel(mget('m-smode')); dimSel(mget('m-res-sel'));
   mget('cammodal').classList.add('show');
 }
 function closeCamEditor(){ mget('cammodal').classList.remove('show'); }
@@ -1435,12 +1452,12 @@ function saveCamEditor(){
   } else { delete c.scale; delete c.scale_mode; delete c.fps; delete c.bitrate; }
   if(!CFG.cameras) CFG.cameras=[];
   if(CAMIDX>=0) CFG.cameras[CAMIDX]=c; else CFG.cameras.push(c);
-  closeCamEditor(); renderCamsSummary();
+  markDirty(); closeCamEditor(); renderCamsSummary();
 }
 function delCam(i){
   var nm=(CFG.cameras&&CFG.cameras[i]&&CFG.cameras[i].name)||'this camera';
   if(!confirm('Remove '+nm+'?')) return;
-  CFG.cameras.splice(i,1); renderCamsSummary();
+  CFG.cameras.splice(i,1); markDirty(); renderCamsSummary();
 }
 function gatherForm(){
   // Start from the loaded config so unknown top-level keys (e.g. ha_base) survive a save.
@@ -1489,7 +1506,7 @@ async function saveConfig(){
   msg('cfgmsg','<span class="pending">saving&hellip;</span>');
   var r; try { r = await (await fetch('api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json(); }
   catch(e){ msg('cfgmsg','<span class="badge error">ERROR</span> '+esc(e)); return; }
-  if(r.ok){ msg('cfgmsg','<span class="badge ok">SAVED</span> applied &mdash; streams restarting'); loadCameras(); }
+  if(r.ok){ cfgDirty=false; msg('cfgmsg','<span class="badge ok">SAVED</span> applied &mdash; streams restarting'); loadCameras(); }
   else { msg('cfgmsg','<span class="badge error">ERROR</span> '+esc(r.error||'save failed')); }
 }
 
