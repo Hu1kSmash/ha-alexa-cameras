@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.7
+
+- Latency block: added a **Buffer** row between Detected and Latency showing the current segment count
+  (`hls_list_size`) and where to change it (Configuration → Streaming), so the **Latency** row's
+  `seg × length` math reads straight off the two rows above it.
+
 ## 1.15.6
 
 - Latency **Detected** row now spells out the arithmetic — *"Source keyframe every 2s (camera I-frame

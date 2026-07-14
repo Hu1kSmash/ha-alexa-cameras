@@ -1321,6 +1321,7 @@ function setLat(name, L){
   var sl=fmtN(L.seg_len), sc=fmtN(L.secs), rows='';
   if(L.gop){ rows+=latRow('Detected','','Source keyframe every '+sl+'s (camera <b>I-frame interval '+L.gop+' frames</b> &divide; '+L.fps+' fps = '+sl+'s)'); }
   else if(L.fps){ rows+=latRow('Detected','','transcoded output @ '+L.fps+' fps &mdash; the add-on sets segment length (~1s), not the camera'); }
+  rows+=latRow('Buffer','','<b>'+L.segs+' segment'+(L.segs==1?'':'s')+'</b> in the playlist &mdash; set under Configuration &rarr; Streaming (HLS buffer segments).');
   rows+=latRow('Latency','','&#9201; Alexa live view &asymp; <b>'+sc+'s</b> behind real-time ('+L.segs+' seg &times; '+sl+'s)');
   var tweak;
   if(L.gop && L.gop1s && L.seg_len>1.1){
