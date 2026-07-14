@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.18.1
+
+- **Per-camera announcement voice** — a camera can now set its own default TTS engine for `{text}`
+  audio injections (an *Announcement voice* dropdown in its Edit dialog, shown when Audio is
+  `inject`/`inject_mix`), overriding the global. Precedence: per-request `engine` → the camera's own →
+  the global default.
+- Camera summary: **uniform-width pills**, and every camera now shows an **always-on** or **on-demand**
+  pill (always-on cameras previously showed nothing).
+- Camera editor dialog: a **shaded title bar with a ✕ close** button, and the confirm button is now
+  **OK** (it applies your edits to the form; you still hit **Save & apply** to persist to disk).
+
 ## 1.18.0
 
 - **Cameras configuration reworked into a summary + per-camera editor dialog** — the inline table is

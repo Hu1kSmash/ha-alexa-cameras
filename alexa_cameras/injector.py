@@ -77,6 +77,7 @@ feeders = {}            # cam -> Feeder
 #   tts_engine   : default HA TTS entity for the {"text":...} convenience mode
 #   ha_base      : base URL the add-on fetches HA audio from (internal, avoids hairpin NAT)
 SETTINGS = {"token": "", "tts_engine": "", "ha_base": "http://homeassistant:8123"}
+CAM_TTS = {}            # cam name -> its own default TTS engine (overrides the global tts_engine)
 
 
 def load_settings():
@@ -87,6 +88,12 @@ def load_settings():
     SETTINGS["token"] = str(cfg.get("inject_token", "")).strip()
     SETTINGS["tts_engine"] = str(cfg.get("tts_engine", "")).strip()
     SETTINGS["ha_base"] = (str(cfg.get("ha_base", "")).strip() or "http://homeassistant:8123").rstrip("/")
+    CAM_TTS.clear()
+    for c in (cfg.get("cameras") or []):
+        nm = str(c.get("name", "")).strip()
+        eng = str(c.get("tts_engine", "")).strip()
+        if nm and eng:
+            CAM_TTS[nm] = eng
 
 
 def _supervisor_token():
@@ -265,7 +272,9 @@ class Handler(BaseHTTPRequestHandler):
             if req.get("test"):
                 pcm = beep_pcm()
             elif req.get("text"):
-                pcm = decode_to_pcm(tts_url_for(req["text"], req.get("engine", "")))
+                # engine precedence: per-request 'engine' > this camera's own tts_engine > global
+                eng = req.get("engine", "") or CAM_TTS.get(cam, "")
+                pcm = decode_to_pcm(tts_url_for(req["text"], eng))
             elif req.get("url") or req.get("file"):
                 pcm = decode_to_pcm(req.get("url") or req.get("file"))
             else:

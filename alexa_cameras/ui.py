@@ -969,9 +969,10 @@ INDEX_HTML = r"""<!doctype html>
   .camsum { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; flex-wrap:wrap; }
   .camsum .cname { font-weight:600; font-size:1rem; min-width:100px; }
   .camsum .csrc { font-family:ui-monospace,monospace; font-size:.73rem; opacity:.6; word-break:break-all; flex:1; min-width:150px; }
-  .camsum .cpill { font-size:.72rem; padding:1px 9px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; }
+  .camsum .cpill { font-size:.72rem; padding:2px 10px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; min-width:78px; text-align:center; box-sizing:border-box; }
   .camsum .cpill.rst { border-color:#2e9d6e; color:#2e9d6e; }
   .camsum .cpill.aud { border-color:#7c5cff; color:#7c5cff; }
+  .camsum .cpill.on { opacity:.5; border-style:dashed; }
   .camsum .cact { display:flex; gap:6px; margin-left:auto; }
   .camsum .cact button { border:1px solid var(--line); background:transparent; color:inherit; border-radius:7px; padding:4px 11px; cursor:pointer; font-size:.8rem; }
   .camsum .cact button:hover { background:var(--dim); }
@@ -982,7 +983,10 @@ INDEX_HTML = r"""<!doctype html>
   @media (prefers-color-scheme:dark){ .modal { background:#1c1f26; } }
   :root[data-theme="light"] .modal { background:#fff; }
   :root[data-theme="dark"] .modal { background:#1c1f26; }
-  .modal h3 { margin:0 0 14px; font-size:1.05rem; }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; margin:-20px -22px 16px; padding:11px 16px 11px 18px; background:rgba(127,127,127,.13); border-bottom:1px solid var(--line); border-radius:14px 14px 0 0; }
+  .modal-head h3 { margin:0; font-size:1.02rem; }
+  .modal-x { background:transparent; border:0; color:inherit; font-size:1.15rem; line-height:1; cursor:pointer; opacity:.55; padding:3px 8px; border-radius:7px; }
+  .modal-x:hover { opacity:1; background:rgba(127,127,127,.22); }
   .modal .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
   .modal .seg button { background:transparent; color:inherit; border:0; padding:6px 14px; cursor:pointer; font-size:.85rem; }
   .modal .seg button.on { background:rgba(59,130,246,.18); font-weight:600; }
@@ -1122,7 +1126,7 @@ INDEX_HTML = r"""<!doctype html>
 
   <div id="cammodal" class="modal-bg" onclick="if(event.target===this)closeCamEditor()">
     <div class="modal">
-      <h3 id="cammodal-title">Edit camera</h3>
+      <div class="modal-head"><h3 id="cammodal-title">Edit camera</h3><button class="modal-x" onclick="closeCamEditor()" title="Close (discard changes)">&#10005;</button></div>
       <label class="fld"><span>Name <span style="opacity:.55">(lowercase letters/numbers/underscore &mdash; the URL segment)</span></span>
         <input id="m-name" oninput="sanitizeName(this)" placeholder="frontporch"></label>
       <div class="fld"><span>Source</span>
@@ -1140,11 +1144,13 @@ INDEX_HTML = r"""<!doctype html>
           <option value="transcode">transcode &mdash; re-encode to H.264 Baseline (H.265 / H.264-High sources)</option>
         </select></label>
       <label class="fld"><span>Audio</span>
-        <select id="m-audio">
+        <select id="m-audio" onchange="camAudioChange()">
           <option value="">(none) &mdash; the source's own audio, if any</option>
           <option value="inject">inject &mdash; replace audio with announcements</option>
           <option value="inject_mix">inject_mix &mdash; keep audio + overlay announcements</option>
         </select></label>
+      <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(this camera's default TTS engine for <code>{text}</code> injections; blank = global default)</span></span>
+        <select id="m-tts"></select></label>
       <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye); quiets logs, skips the stall watchdog, validates as <i>Idle</i></span></label>
       <div class="adv">
         <h4>Advanced <span style="opacity:.55;font-weight:400">(blank = use the global default)</span></h4>
@@ -1158,8 +1164,7 @@ INDEX_HTML = r"""<!doctype html>
       </div>
       <div class="modal-err" id="m-err"></div>
       <div class="mbtns">
-        <button class="pwtoggle" onclick="closeCamEditor()">Cancel</button>
-        <button class="primary" onclick="saveCamEditor()">Save camera</button>
+        <button class="primary" onclick="saveCamEditor()">OK</button>
       </div>
     </div>
   </div>
@@ -1323,20 +1328,22 @@ function renderForm(){
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
   renderCamsSummary();
 }
+var TTSENGINES = [];   // cached engine list (fetched once when the config tab loads)
+function ttsOptionsHtml(cur, inherit){
+  var seen={}, opts = inherit
+    ? '<option value=""'+(cur===''?' selected':'')+'>(use global default)</option>'
+    : '<option value=""'+(cur===''?' selected':'')+'>(none)</option>';
+  TTSENGINES.forEach(function(e){ if(!e.id || seen[e.id]) return; seen[e.id]=1;
+    var label = e.id + (e.name && e.name!==e.id ? '  ('+e.name+')' : '');
+    opts += '<option value="'+esc(e.id)+'"'+(e.id===cur?' selected':'')+'>'+esc(label)+'</option>'; });
+  if(cur && !seen[cur]) opts += '<option value="'+esc(cur)+'" selected>'+esc(cur)+'  (not detected)</option>';
+  return opts;
+}
 function populateTtsEngines(){
   var sel = document.getElementById('f-tts-engine'); if(!sel) return;
   var cur = CFG.tts_engine || '';
-  function render(engines){
-    var seen = {};
-    var opts = '<option value=""'+(cur===''?' selected':'')+'>(none)</option>';
-    engines.forEach(function(e){ if(!e.id || seen[e.id]) return; seen[e.id]=1;
-      var label = e.id + (e.name && e.name!==e.id ? '  ('+e.name+')' : '');
-      opts += '<option value="'+esc(e.id)+'"'+(e.id===cur?' selected':'')+'>'+esc(label)+'</option>'; });
-    if(cur && !seen[cur]) opts += '<option value="'+esc(cur)+'" selected>'+esc(cur)+'  (not detected)</option>';
-    sel.innerHTML = opts;
-  }
-  render([]);   // baseline (none + current) while the fetch runs
-  fetch('api/tts_engines').then(function(r){return r.json();}).then(function(r){ render((r&&r.engines)||[]); }).catch(function(){});
+  sel.innerHTML = ttsOptionsHtml(cur, false);   // baseline (none + current) while the fetch runs
+  fetch('api/tts_engines').then(function(r){return r.json();}).then(function(r){ TTSENGINES=(r&&r.engines)||[]; sel.innerHTML=ttsOptionsHtml(cur,false); }).catch(function(){});
 }
 /* ---- Cameras: read-only summary + per-camera modal editor ---- */
 function maskUrl(u){ return String(u).replace(/(rtsp:\/\/[^:@/]+):[^@/]*@/i,'$1:***@'); }
@@ -1352,7 +1359,7 @@ function camSummaryRow(c,i){
   var pills = (c.url ? '<span class="cpill'+(isR?' rst':'')+'">'+(isR?'Restream':'URL')+'</span>' : '<span class="cpill">Direct</span>')+
     '<span class="cpill">'+(c.mode==='copy'?'copy':'transcode')+'</span>';
   if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud">'+esc(c.audio_source)+'</span>';
-  if(c.on_demand) pills+='<span class="cpill">on-demand</span>';
+  pills+= c.on_demand ? '<span class="cpill">on-demand</span>' : '<span class="cpill on">always-on</span>';
   if(c.mode!=='copy' && c.scale) pills+='<span class="cpill">'+esc(String(c.scale))+'</span>';
   var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');
   return '<div class="camsum"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
@@ -1369,16 +1376,18 @@ function openCamEditor(i){
   mget('m-name').value=c.name||''; mget('m-host').value=c.host||''; mget('m-path').value=c.path||''; mget('m-url').value=c.url||'';
   mget('m-mode').value=(c.mode==='copy')?'copy':'transcode';
   mget('m-audio').value=(c.audio_source==='inject'||c.audio_source==='inject_mix')?c.audio_source:'';
+  mget('m-tts').innerHTML=ttsOptionsHtml(c.tts_engine||'', true);
   mget('m-ondemand').checked=!!c.on_demand;
   mget('m-buf').value=c.hls_list_size||'';
   mget('m-res-sel').innerHTML=resOpts(true); setResField('m-res-sel','m-res-cust', c.scale||'');
   mget('m-smode').value=(c.scale_mode==='fit'||c.scale_mode==='stretch')?c.scale_mode:'';
   mget('m-fps').value=c.fps||''; mget('m-br').value=c.bitrate||'';
   mget('m-err').textContent='';
-  camSrcType(c.url ? 'url' : 'host'); camModeChange();
+  camSrcType(c.url ? 'url' : 'host'); camModeChange(); camAudioChange();
   mget('cammodal').classList.add('show');
 }
 function closeCamEditor(){ mget('cammodal').classList.remove('show'); }
+function camAudioChange(){ var a=mget('m-audio').value; mget('m-tts-fld').style.display=(a==='inject'||a==='inject_mix')?'':'none'; }
 function camSrcType(t){
   document.querySelectorAll('#m-srcseg button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-src')===t); });
   var host=(t==='host');
@@ -1412,6 +1421,7 @@ function saveCamEditor(){
   if(srcT==='host'){ c.host=host; delete c.url; if(path) c.path=path; else delete c.path; }
   else { c.url=url; delete c.host; delete c.path; }
   var au=mget('m-audio').value; if(au) c.audio_source=au; else delete c.audio_source;
+  var tts=mget('m-tts').value; if((au==='inject'||au==='inject_mix') && tts) c.tts_engine=tts; else delete c.tts_engine;
   if(mget('m-ondemand').checked) c.on_demand=true; else delete c.on_demand;
   if(bufS!=='') c.hls_list_size=buf; else delete c.hls_list_size;
   if(mode==='transcode'){

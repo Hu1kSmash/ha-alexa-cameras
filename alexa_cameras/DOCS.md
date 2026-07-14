@@ -733,9 +733,12 @@ accident.
   there and as a `tts.*` entity. The `tts_engine` value is that **entity ID** — e.g.
   `tts.google_en_com`. Find the exact ID under **Developer Tools → States** (filter `tts.`), or
   just pick it from the dropdown in the add-on's config **form** (it lists your installed engines,
-  so there's nothing to guess). Set the default with `tts_engine`, or override per request with an
-  `engine` field: `{"cam":"birdseye","text":"…","engine":"tts.piper"}`. Switching voices is a
-  one-line change — the add-on just asks HA to render with that engine.
+  so there's nothing to guess). Set the **global** default with `tts_engine`; give a **single camera**
+  its own default voice in that camera's **Edit** dialog (an *Announcement voice* dropdown, shown when
+  Audio is `inject`/`inject_mix`); or override **per request** with an `engine` field:
+  `{"cam":"birdseye","text":"…","engine":"tts.piper"}`. Precedence is **request `engine` → the
+  camera's own → the global default**. Switching voices is a one-line change — the add-on just asks HA
+  to render with that engine.
 - **`{url}` mode** is **completely TTS-agnostic** — you make the audio *however you like* (any
   engine, a local LLM writing an MP3, a pre-recorded clip, a chime) and hand `/say` a URL to fetch.
   The add-on plays whatever's there; it has no idea what produced it. Use this for anything that
