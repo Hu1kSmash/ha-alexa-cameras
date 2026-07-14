@@ -870,6 +870,7 @@ INDEX_HTML = r"""<!doctype html>
   .latres:not(:empty) { margin-top:8px; padding-left:9px; border-left:2px solid rgba(127,127,127,.3); display:grid; gap:5px; }
   .res.dbg { font-size:.78rem; }
   .res.dbg .k { font-weight:500; opacity:.55; }
+  .res.dbg .v { display:block; line-height:1.5; }
   .res.dbg.tweak .v { opacity:.95; }
   .pline { margin-bottom:12px; }
   .prow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -1323,7 +1324,8 @@ function setLat(name, L){
   rows+=latRow('Latency','','&#9201; Alexa live view &asymp; <b>'+sc+'s</b> behind real-time ('+L.segs+' seg &times; '+sl+'s)');
   var tweak;
   if(L.gop && L.gop1s && L.seg_len>1.1){
-    tweak='Reducing your camera\'s sub-stream <b>I-frame interval to '+L.gop1s+'</b> (1 keyframe/sec) would shorten segments to ~1s &mdash; about '+fmtN(L.segs)+'s of lag. Lowering <b>HLS buffer segments</b> (Configuration &rarr; Streaming) cuts it further.';
+    tweak='Reducing your camera\'s sub-stream <b>I-frame interval to '+L.gop1s+'</b> (1 keyframe/sec) would shorten segments to ~1s &mdash; about '+fmtN(L.segs)+'s of lag.';
+    if(L.segs>2){ tweak+=' Lowering <b>HLS buffer segments</b> (Configuration &rarr; Streaming) cuts it further.'; }
   } else if(L.segs>2){
     tweak='Segments are already ~1s. To trim further, lower <b>HLS buffer segments</b> (Configuration &rarr; Streaming) toward 2.';
   } else {

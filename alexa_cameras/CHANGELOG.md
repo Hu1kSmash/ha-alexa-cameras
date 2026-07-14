@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.5
+
+- Latency **Tune** row: no longer suggests lowering **HLS buffer segments** when it's already at the
+  floor of **2**, and fixed a stray gap that flexbox inserted before bolded phrases in the debug rows.
+
 ## 1.15.4
 
 - **Latency readout moved into its own rows** beneath **Source** / **Output** on the Validate card, so
