@@ -280,6 +280,17 @@ def source_kind(cam, cfg):
     return {"label": "—", "why": ""}
 
 
+def path_kind(cam, cfg):
+    """For the Validate page: is the RTSP path the shared default, a per-camera override, or in a URL?"""
+    if str(cam.get("url", "")).strip():
+        return {"label": "in URL", "why": "the RTSP path is part of the full URL"}
+    p = str(cam.get("path", "")).strip()
+    if p:
+        return {"label": "override", "why": "per-camera Path override: " + p}
+    dp = str(cfg.get("default_path", "")).strip()
+    return {"label": "default", "why": "shared Default RTSP path: " + (dp or "(none set)")}
+
+
 def check_source(cam, cfg):
     src = camera_source(cam, cfg)
     mode = str(cam.get("mode", "transcode"))
@@ -636,11 +647,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "api/cameras":
             def cam_info(c):
                 sk = source_kind(c, cfg)
+                pk = path_kind(c, cfg)
                 return {
                     "name": c.get("name", ""), "mode": c.get("mode", ""),
                     "audio": str(c.get("audio_source", "")).strip(),
                     "on_demand": is_on_demand(c),
                     "source_label": sk["label"], "source_why": sk["why"],
+                    "path_label": pk["label"], "path_why": pk["why"],
                     "source": mask(camera_source(c, cfg))}
             return self._send(200, json.dumps([cam_info(c) for c in cams]))
         if path.startswith("api/validate/"):
@@ -730,8 +743,12 @@ INDEX_HTML = r"""<!doctype html>
   table.cams td.src { font-family:ui-monospace,monospace; font-size:.78rem; opacity:.75; word-break:break-all; }
   table.cams input, table.cams select { width:100%; font:inherit; font-size:.82rem; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
   .mode { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); }
-  .srcb { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); cursor:help; }
-  .srcb.rst { border-color:#2e9d6e; color:#2e9d6e; }
+  .cfg { display:grid; grid-template-columns:78px 84px 72px 84px 84px; gap:6px; align-items:center; }
+  .cfg .c { font-size:.72rem; padding:1px 6px; border-radius:999px; border:1px solid var(--line); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
+  .cfg .c.rst { border-color:#2e9d6e; color:#2e9d6e; }
+  .cfg .c.off { opacity:.4; border-style:dashed; cursor:default; }
+  .vhead { display:flex; align-items:center; gap:10px; padding:2px 0 8px; }
+  .vhead .cfg .c { border:none; opacity:.55; font-weight:600; padding:0 6px; cursor:default; }
   button.primary { font:inherit; font-weight:600; padding:8px 15px; border-radius:9px; cursor:pointer; border:1px solid #3b82f6; background:#3b82f6; color:#fff; }
   button.primary:hover { background:#2563eb; border-color:#2563eb; }
   button { font:inherit; padding:6px 12px; border-radius:8px; cursor:pointer; border:1px solid var(--line); background:transparent; color:inherit; }
@@ -1152,27 +1169,34 @@ async function loadLogs(){
 }
 
 /* ---------- Validate ---------- */
+function cfgc(v,cls,title){ return '<span class="c'+(cls?' '+cls:'')+'"'+(title?' title="'+esc(title)+'"':'')+'>'+esc(v)+'</span>'; }
 function renderValidate(){
   var list = document.getElementById('list');
   if(!CAMS || !CAMS.length){ list.innerHTML='<p>No cameras configured.</p>'; return; }
-  list.innerHTML = CAMS.map(function(c){
+  // Header row: labels the right-justified config columns so a user can scan down each column
+  // and instantly spot a camera the add-on read differently than expected.
+  var head = '<div class="vhead"><span style="flex:1"></span><div class="cfg">'+
+    '<span class="c">Mode</span><span class="c">Source</span><span class="c">Path</span>'+
+    '<span class="c">Audio</span><span class="c">On-demand</span></div></div>';
+  var cards = CAMS.map(function(c){
     var btn = c.on_demand
       ? '<button onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check, which briefly wakes the on-demand source (e.g. Frigate birdseye)">Check on-demand stream</button>'
       : '<button onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
-    var tags = '<span class="mode" title="'+(c.mode==='copy'?'Remux only (near-zero CPU) — source is already H.264 Baseline/Main':'Re-encode to H.264 Baseline (uses CPU)')+'">mode: '+esc(c.mode)+'</span>';
-    if(c.source_label && c.source_label!=='—'){
-      var rst = (c.source_label==='Restream');
-      tags += '<span class="srcb'+(rst?' rst':'')+'" title="'+esc(c.source_why||'')+'">'+esc(c.source_label)+'</span>';
-    }
-    if(c.audio){ tags += '<span class="mode" title="Alexa announcements play through this camera\'s audio track (see Audio injection)">audio: '+esc(c.audio)+'</span>'; }
-    if(c.on_demand){ tags += '<span class="mode" title="Connects only while something is watching; skipped by Validate all so it isn\'t woken">on-demand</span>'; }
-    return ''+
-    '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'><div class="row"><span class="name">'+esc(c.name)+'</span>'+
-      tags+'<span style="flex:1"></span>'+
-      btn+'</div>'+
-    '<div class="src2">'+esc(c.source)+'</div><div class="results">'+
-      row('Source',c.name+'-source')+row('Output',c.name+'-output')+
-    '</div></div>'; }).join('');
+    var cfg = '<div class="cfg">'+
+      cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
+      cfgc(c.source_label||'—', c.source_label==='Restream'?'rst':'', c.source_why||'')+
+      cfgc(c.path_label||'—', '', c.path_why||'')+
+      (c.audio ? cfgc(c.audio, '', 'Alexa announcements play through this camera\'s audio track (see Audio injection)') : cfgc('–','off','No audio injection on this camera'))+
+      (c.on_demand ? cfgc('yes','','Connects only while watched; skipped by Validate all so it isn\'t woken') : cfgc('–','off','Always-on camera'))+
+    '</div>';
+    return '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'>'+
+      '<div class="row"><span class="name">'+esc(c.name)+'</span>'+
+        '<span style="flex:1"></span>'+btn+cfg+'</div>'+
+      '<div class="src2">'+esc(c.source)+'</div><div class="results">'+
+        row('Source',c.name+'-source')+row('Output',c.name+'-output')+
+      '</div></div>';
+  }).join('');
+  list.innerHTML = head + cards;
 }
 function badge(s){ return '<span class="badge '+s+'">'+s.toUpperCase()+'</span>'; }
 function badgeText(s,t){ return '<span class="badge '+s+'">'+esc(t)+'</span>'; }

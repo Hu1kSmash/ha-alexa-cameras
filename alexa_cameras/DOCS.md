@@ -251,12 +251,20 @@ on the add-on's own output. Per camera it reports:
 - **Output** — confirms the add-on's `:8888` HLS is live and decodable H.264 Baseline (what Alexa
   actually opens).
 
-Each camera card also shows **how the add-on read its config** — badges for **mode**, **audio**
-(inject / inject_mix), **on-demand**, and the **source type**: **Direct** (a Host/IP, pulled straight
-from the camera), **Restream** (a URL pointing at a *local* restreamer — auto-detected when the host
-is your `lan_ip`, `localhost`, a Frigate/go2rtc hostname, or port `8554`; hover for why it matched),
-or **Direct URL** (a full RTSP URL used as-is). So you can glance at the page and confirm each camera
-is interpreted the way you intended.
+Each camera card also shows **how the add-on read its config**, in aligned columns under a header
+(**Mode · Source · Path · Audio · On-demand**) — so you can scan straight down a column and instantly
+spot a camera interpreted differently than the rest. The columns:
+
+- **Mode** — `copy` / `transcode`.
+- **Source** — **Direct** (a Host/IP, pulled straight from the camera), **Restream** (green — a URL
+  pointing at a *local* restreamer, auto-detected when the host is your `lan_ip`, `localhost`, a
+  Frigate/go2rtc hostname, or port `8554`), or **Direct URL** (a full RTSP URL used as-is).
+- **Path** — **default** (the shared *Default RTSP path*), **override** (a per-camera Path), or
+  **in URL** (baked into a full URL).
+- **Audio** — `inject` / `inject_mix`, or `–` if none.
+- **On-demand** — `yes` / `–`.
+
+Hover any badge for the specifics (e.g. *why* Source matched Restream, or the exact Path used).
 
 Green means good; anything off is flagged in plain English. Below, **driveway** on
 `transcode` gets a **WARN** — its source is *already* Alexa-ready H.264 Baseline, so it could

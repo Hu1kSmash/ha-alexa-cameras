@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.0
+
+- **Validate streams config badges are now aligned columns with a header.** The per-camera
+  interpretation (**Mode · Source · Path · Audio · On-demand**) is right-justified into fixed columns
+  under a header row, so scrolling the page lets you scan straight down a column and instantly spot a
+  camera the add-on read differently than the rest. Added a **Path** column (**default** shared RTSP
+  path / per-camera **override** / **in URL**). Hover any badge for the details.
+
 ## 1.12.0
 
 - **Validate streams now shows how the add-on reads each camera's config**, so you can eyeball the
