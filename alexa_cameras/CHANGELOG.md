@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.8
+
+- Latency **Detected** row now bolds the **segment length** (e.g. **2s**) rather than the I-frame
+  interval, so the eye follows it straight into the **Latency** row's `seg × length` math.
+
 ## 1.15.7
 
 - Latency block: added a **Buffer** row between Detected and Latency showing the current segment count
