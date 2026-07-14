@@ -110,8 +110,12 @@ full `url` ignores these and uses whatever is in that URL.)
 
 ### Cameras
 
-Each camera is one row in the **Cameras** table: a `name`, plus **either** a `host` **or** a
-full `url`.
+The **Cameras** panel is a read-only summary — one line per camera. **Click Edit** (or **+ Add
+camera**) to open a dialog where you set everything for that camera with dropdowns and validation:
+the basics below, plus per-camera **Advanced** overrides for the streaming settings (HLS buffer, and —
+for `transcode` cameras — resolution, scale mode, frame rate, bitrate). Each advanced field is blank
+by default and **inherits the global default** ([Streaming (advanced)](#streaming-advanced)) unless you
+set it. No YAML required, though **View as YAML** remains for bulk edits.
 
 | Field | Required | Description |
 |---|---|---|
@@ -139,7 +143,8 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 | Field | Required | Description |
 |---|---|---|
 | **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s — the **Validate streams** tab detects and shows your camera's current I-frame interval so you can trace it back and tune it (see [Live-view latency](#live-view-latency)). Leave this blank to use the default of 4. |
-| **Transcode resolution** (`transcode_scale`) | No | Output size for cameras on `mode: transcode` only (a `copy` camera keeps its source resolution — you pick that at the camera). Written `WIDTHxHEIGHT`, default **`1280x720`**. It's a **box the video is scaled *within*, aspect preserved** (no stretch, even for a 4:3 source), so a widescreen source fills it and a 4:3 source fits inside it. **Drop it to cut bandwidth/latency** on a small or far Echo — e.g. `854x480` or `640x480` looks fine on the little screen and pushes far fewer bytes. Range `160x120`–`1920x1080`. A single camera can override this in YAML with a per-camera **`scale`** (same `WIDTHxHEIGHT` form). |
+| **Transcode resolution** (`transcode_scale`) | No | Output size for cameras on `mode: transcode` only (a `copy` camera keeps its source resolution — you pick that at the camera). Written `WIDTHxHEIGHT`, default **`1280x720`**. It's a **box the video is scaled *within*, aspect preserved** (no stretch, even for a 4:3 source), so a widescreen source fills it and a 4:3 source fits inside it. **Drop it to cut bandwidth/latency** on a small or far Echo — e.g. `854x480` or `640x480` looks fine on the little screen and pushes far fewer bytes. Range `160x120`–`1920x1080`. Any camera can override this (and the others below) in its **Edit** dialog. |
+| **Scale mode** (`scale_mode`) | No | How the video fits the resolution box, default **`fit`**. **`fit`** shrinks it *inside* the box preserving aspect (no distortion — a 4:3 source gets pillar-boxed to fit); **`stretch`** forces the exact `WIDTHxHEIGHT`, distorting anything that isn't that aspect ratio. Leave on `fit` unless you specifically want to fill a mismatched frame. |
 | **Transcode frame rate** (`transcode_fps`) | No | Output fps for `transcode` cameras, default **15**. Also sets the keyframe interval (one keyframe per second is kept regardless). Lower fps = fewer bytes; range **5–30**. |
 | **Transcode bitrate cap** (`transcode_bitrate`) | No | Peak output bitrate in **kbps** for `transcode` cameras, e.g. `1500`. Blank/`0` = **uncapped** (quality-based). This is often the **biggest lever for a jittery, Wi-Fi-starved stream** — capping the bitrate bounds how many bytes each segment can be, so the Echo's link never has to fetch a sudden spike. Range **200–20000**. Only affects transcoded cameras (a `copy` camera's bitrate is whatever the source sends). |
 

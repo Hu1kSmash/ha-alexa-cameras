@@ -170,6 +170,9 @@ def validate_config(data):
             return "transcode_bitrate must be a whole number in kbps (e.g. 1500), or blank for uncapped"
         if not 200 <= tbv <= 20000:
             return "transcode_bitrate must be between 200 and 20000 kbps (or blank for uncapped)"
+    sm = data.get("scale_mode")
+    if sm not in (None, "") and str(sm).strip().lower() not in ("fit", "stretch"):
+        return "scale_mode must be 'fit' or 'stretch'"
     cams = data.get("cameras")
     if cams is None:
         return "missing 'cameras:' list"
@@ -196,6 +199,33 @@ def validate_config(data):
             err = _scale_error(sc, f"camera '{name}' scale")
             if err:
                 return err
+        cm = c.get("scale_mode")
+        if cm not in (None, "") and str(cm).strip().lower() not in ("fit", "stretch"):
+            return f"camera '{name}' scale_mode must be 'fit' or 'stretch'"
+        cf = c.get("fps")
+        if cf not in (None, ""):
+            try:
+                cfv = int(cf)
+            except (TypeError, ValueError):
+                return f"camera '{name}' fps must be a whole number 5–30"
+            if not 5 <= cfv <= 30:
+                return f"camera '{name}' fps must be 5–30"
+        cb = c.get("bitrate")
+        if cb not in (None, "", 0):
+            try:
+                cbv = int(cb)
+            except (TypeError, ValueError):
+                return f"camera '{name}' bitrate must be a whole number in kbps (200–20000)"
+            if not 200 <= cbv <= 20000:
+                return f"camera '{name}' bitrate must be 200–20000 kbps"
+        cbuf = c.get("hls_list_size")
+        if cbuf not in (None, ""):
+            try:
+                cbufv = int(cbuf)
+            except (TypeError, ValueError):
+                return f"camera '{name}' hls_list_size must be a whole number 2–10"
+            if not 2 <= cbufv <= 10:
+                return f"camera '{name}' hls_list_size must be 2–10"
     return None
 
 
@@ -934,17 +964,37 @@ INDEX_HTML = r"""<!doctype html>
   .pwwrap input { flex:1; min-width:0; }
   .pwtoggle { border:1px solid var(--line); background:transparent; color:inherit; border-radius:8px; padding:0 12px; cursor:pointer; font-size:.82rem; }
   .pwtoggle:hover { background:var(--dim); }
-  /* cameras table proportions + interactions */
-  #camrows { table-layout:fixed; width:100%; min-width:760px; }
-  #camrows th:nth-child(1),#camrows td:nth-child(1){ width:14%; }
-  #camrows th:nth-child(2),#camrows td:nth-child(2){ width:13%; }
-  #camrows th:nth-child(3),#camrows td:nth-child(3){ width:20%; }
-  #camrows th:nth-child(4),#camrows td:nth-child(4){ width:16%; }
-  #camrows th:nth-child(5),#camrows td:nth-child(5){ width:10%; }
-  #camrows th:nth-child(6),#camrows td:nth-child(6){ width:13%; }
-  #camrows th:nth-child(7),#camrows td:nth-child(7){ width:10%; text-align:center; }
-  #camrows th:nth-child(8),#camrows td:nth-child(8){ width:4%; text-align:right; padding-right:0; }
-  table.cams tr:hover td { background:rgba(59,130,246,.06); }
+  /* Cameras: read-only summary list + per-camera modal editor */
+  .camlist { display:flex; flex-direction:column; gap:8px; }
+  .camsum { display:flex; align-items:center; gap:9px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; flex-wrap:wrap; }
+  .camsum .cname { font-weight:600; font-size:1rem; min-width:100px; }
+  .camsum .csrc { font-family:ui-monospace,monospace; font-size:.73rem; opacity:.6; word-break:break-all; flex:1; min-width:150px; }
+  .camsum .cpill { font-size:.72rem; padding:1px 9px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; }
+  .camsum .cpill.rst { border-color:#2e9d6e; color:#2e9d6e; }
+  .camsum .cpill.aud { border-color:#7c5cff; color:#7c5cff; }
+  .camsum .cact { display:flex; gap:6px; margin-left:auto; }
+  .camsum .cact button { border:1px solid var(--line); background:transparent; color:inherit; border-radius:7px; padding:4px 11px; cursor:pointer; font-size:.8rem; }
+  .camsum .cact button:hover { background:var(--dim); }
+  .camsum .cact button.del:hover { border-color:#d9534f; color:#d9534f; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-start; justify-content:center; z-index:50; overflow-y:auto; padding:24px 12px; }
+  .modal-bg.show { display:flex; }
+  .modal { background:#fff; border:1px solid var(--line); border-radius:14px; width:min(560px,100%); padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  @media (prefers-color-scheme:dark){ .modal { background:#1c1f26; } }
+  :root[data-theme="light"] .modal { background:#fff; }
+  :root[data-theme="dark"] .modal { background:#1c1f26; }
+  .modal h3 { margin:0 0 14px; font-size:1.05rem; }
+  .modal .seg { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .modal .seg button { background:transparent; color:inherit; border:0; padding:6px 14px; cursor:pointer; font-size:.85rem; }
+  .modal .seg button.on { background:rgba(59,130,246,.18); font-weight:600; }
+  .modal .adv { border-top:1px solid var(--line); margin-top:14px; padding-top:12px; }
+  .modal .adv h4 { margin:0 0 9px; font-size:.9rem; opacity:.85; }
+  .modal .mbtns { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  .modal-err { color:#d9534f; font-size:.82rem; margin-top:10px; min-height:1em; }
+  .fld { display:flex; flex-direction:column; gap:4px; font-size:.85rem; opacity:.95; margin-top:10px; }
+  .fld > span { opacity:.85; }
+  .fld input, .fld select { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; }
+  .fld select option { background:Canvas; color:CanvasText; }
+  .fld.chk { flex-direction:row; align-items:center; gap:8px; }
   .card { transition:border-color .12s, background .12s; }
   .card:hover { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.045); }
   .btn-del { border:none; background:transparent; color:#dc2626; font-size:1.05rem; line-height:1; padding:5px 9px; border-radius:8px; cursor:pointer; opacity:.5; }
@@ -1040,12 +1090,12 @@ INDEX_HTML = r"""<!doctype html>
         </div>
       </div>
       <div class="panel"><h2>Cameras</h2>
-        <div style="overflow-x:auto"><table class="cams" id="camrows"></table></div>
-        <div style="margin-top:10px"><button class="btn-add" onclick="addCamRow()">+ Add camera</button></div>
-        <p class="sub" style="margin-top:10px">Each camera needs a <b>name</b> (lowercase, no spaces) and either a <b>host</b> or a full <b>url</b>. <b>mode</b>: <code>copy</code> if the source is already H.264 Baseline/Main, else <code>transcode</code>. Tick <b>On-demand</b> for a source that's expected to be idle/absent when inactive (e.g. Frigate <b>birdseye</b>) &mdash; it quiets that camera's logs, skips the stall watchdog, and validates as <i>Idle</i> rather than an error.</p>
+        <div id="camlist" class="camlist"></div>
+        <div style="margin-top:12px"><button class="btn-add" onclick="openCamEditor(-1)">+ Add camera</button></div>
+        <p class="sub" style="margin-top:10px">Click <b>Edit</b> on a camera to set everything in one dialog &mdash; source, mode, audio, on&#8209;demand, and (for <code>transcode</code> cameras) resolution, frame rate, bitrate, and buffer &mdash; with dropdowns and validation. No YAML required.</p>
       </div>
       <div class="panel"><h2>Audio injection (optional)</h2>
-        <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in the table above) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
+        <p class="sub" style="margin:0 0 6px">Experimental &mdash; announce <i>through</i> a camera instead of a separate Alexa announcement that tears the view down. Set a camera's <b>Audio</b> (in its Edit dialog above) to <code>inject</code> (replace its audio) or <code>inject_mix</code> (keep its audio + overlay), then send audio to <code>POST http://&lt;this-host&gt;:8790/say</code>. See the docs.</p>
         <div class="cfg-grid">
           <label>Control API token<span class="pwwrap"><input id="f-inject-token" type="password" placeholder="a long random secret (protects :8790)"><button type="button" id="itbtn" class="pwtoggle" onclick="toggleInjectToken()">Show</button></span></label>
           <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
@@ -1057,17 +1107,62 @@ INDEX_HTML = r"""<!doctype html>
           <label>HLS buffer segments<input id="f-hls-list" type="number" min="2" max="10" placeholder="4"></label>
         </div>
         <p class="sub" style="margin:6px 0 0">How many short segments Alexa buffers before playing. <b>Lower = less lag</b> (Alexa starts closer to real&#8209;time), but a smaller buffer can <b>stall</b> on a slow fetch. Default <b>4</b>; try <b>3</b> then <b>2</b> to trim latency, watching for stutters. Each segment is as long as your camera's keyframe interval, so <b>1&#8209;second keyframes</b> on the sub stream are the bigger win.</p>
-        <h3 style="margin:16px 0 8px;font-size:.95rem">Transcode output <span style="opacity:.55;font-weight:400">(only affects <code>mode: transcode</code> cameras)</span></h3>
+        <h3 style="margin:16px 0 8px;font-size:.95rem">Transcode defaults <span style="opacity:.55;font-weight:400">(defaults for <code>mode: transcode</code> cameras &mdash; override per camera in its Edit dialog)</span></h3>
         <div class="cfg-grid">
-          <label>Resolution<input id="f-tscale" type="text" placeholder="1280x720" pattern="[0-9]{2,4}[xX][0-9]{2,4}"></label>
+          <label>Resolution<select id="f-tscale-sel" onchange="onResSel('f-tscale-sel','f-tscale-cust')"></select><input id="f-tscale-cust" type="text" placeholder="1280x720" style="margin-top:6px;display:none"></label>
+          <label>Scale mode<select id="f-smode"><option value="fit">Fit &mdash; preserve aspect (recommended)</option><option value="stretch">Stretch &mdash; fill exactly (may distort)</option></select></label>
           <label>Frame rate (fps)<input id="f-tfps" type="number" min="5" max="30" placeholder="15"></label>
           <label>Bitrate cap (kbps)<input id="f-tbr" type="number" min="200" max="20000" placeholder="uncapped"></label>
         </div>
-        <p class="sub" style="margin:6px 0 0">These apply <b>only when a camera is transcoded</b> (H.265 / H.264&#8209;High sources like Frigate birdseye); <code>copy</code> cameras keep their source resolution. <b>Resolution</b> is a box the video is scaled <i>within</i> (aspect preserved, no stretch) &mdash; drop to e.g. <code>854x480</code> to cut bandwidth/latency on a small or far Echo; default <b>1280x720</b>. <b>Frame rate</b> also sets the keyframe interval (default <b>15</b>). <b>Bitrate cap</b> limits peak bandwidth (blank = quality&#8209;based, uncapped) &mdash; often the biggest lever for a jittery, Wi&#8209;Fi&#8209;starved stream. (A per&#8209;camera <code>scale</code> override is available in <b>View as YAML</b>.)</p>
+        <p class="sub" style="margin:6px 0 0">These apply <b>only when a camera is transcoded</b> (H.265 / H.264&#8209;High sources like Frigate birdseye); <code>copy</code> cameras keep their source resolution. Lower <b>Resolution</b>/<b>Frame rate</b> or cap the <b>Bitrate</b> to cut bandwidth/latency on a small or far Echo. <b>Scale mode</b>: <i>Fit</i> shrinks the video inside the chosen box without distortion; <i>Stretch</i> forces the exact size. Any camera can override these in its <b>Edit</b> dialog.</p>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>
   </section>
+
+  <div id="cammodal" class="modal-bg" onclick="if(event.target===this)closeCamEditor()">
+    <div class="modal">
+      <h3 id="cammodal-title">Edit camera</h3>
+      <label class="fld"><span>Name <span style="opacity:.55">(lowercase letters/numbers/underscore &mdash; the URL segment)</span></span>
+        <input id="m-name" oninput="sanitizeName(this)" placeholder="frontporch"></label>
+      <div class="fld"><span>Source</span>
+        <div class="seg" id="m-srcseg">
+          <button type="button" data-src="host" onclick="camSrcType('host')">Direct camera (IP)</button>
+          <button type="button" data-src="url" onclick="camSrcType('url')">Full RTSP URL / restream</button>
+        </div>
+      </div>
+      <label class="fld" id="m-host-fld"><span>Host (camera IP)</span><input id="m-host" placeholder="192.168.1.64"></label>
+      <label class="fld" id="m-path-fld"><span>Path <span style="opacity:.55">(optional &mdash; blank uses the shared Default RTSP path)</span></span><input id="m-path" placeholder="/cam/realmonitor?channel=1&amp;subtype=1"></label>
+      <label class="fld" id="m-url-fld"><span>RTSP URL</span><input id="m-url" placeholder="rtsp://user:pass@host:554/stream  or  rtsp://ccab4aaf-frigate:8554/cam_sub"></label>
+      <label class="fld"><span>Mode</span>
+        <select id="m-mode" onchange="camModeChange()">
+          <option value="copy">copy &mdash; source is already H.264 Baseline/Main (near-zero CPU)</option>
+          <option value="transcode">transcode &mdash; re-encode to H.264 Baseline (H.265 / H.264-High sources)</option>
+        </select></label>
+      <label class="fld"><span>Audio</span>
+        <select id="m-audio">
+          <option value="">(none) &mdash; the source's own audio, if any</option>
+          <option value="inject">inject &mdash; replace audio with announcements</option>
+          <option value="inject_mix">inject_mix &mdash; keep audio + overlay announcements</option>
+        </select></label>
+      <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye); quiets logs, skips the stall watchdog, validates as <i>Idle</i></span></label>
+      <div class="adv">
+        <h4>Advanced <span style="opacity:.55;font-weight:400">(blank = use the global default)</span></h4>
+        <label class="fld"><span>HLS buffer segments <span style="opacity:.55">(2&#8211;10; lower = less lag)</span></span><input id="m-buf" type="number" min="2" max="10" placeholder="default"></label>
+        <div id="m-transcode-adv">
+          <label class="fld"><span>Resolution</span><select id="m-res-sel" onchange="onResSel('m-res-sel','m-res-cust')"></select><input id="m-res-cust" type="text" placeholder="1280x720" style="margin-top:6px;display:none"></label>
+          <label class="fld"><span>Scale mode</span><select id="m-smode"><option value="">(default)</option><option value="fit">Fit &mdash; preserve aspect</option><option value="stretch">Stretch &mdash; fill exactly</option></select></label>
+          <label class="fld"><span>Frame rate (fps)</span><input id="m-fps" type="number" min="5" max="30" placeholder="default"></label>
+          <label class="fld"><span>Bitrate cap (kbps)</span><input id="m-br" type="number" min="200" max="20000" placeholder="uncapped / default"></label>
+        </div>
+      </div>
+      <div class="modal-err" id="m-err"></div>
+      <div class="mbtns">
+        <button class="pwtoggle" onclick="closeCamEditor()">Cancel</button>
+        <button class="primary" onclick="saveCamEditor()">Save camera</button>
+      </div>
+    </div>
+  </div>
 
   <section id="tab-logs" hidden>
     <div class="row" style="margin-bottom:10px">
@@ -1123,27 +1218,6 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 // so force it to safe characters live: lowercase letters, numbers, underscore. This stops a
 // user pasting/typing a space or capital that would break the stream; the server validates too.
 function sanitizeName(el){ var s=el.value.toLowerCase().replace(/[^a-z0-9_]/g,''); if(s!==el.value) el.value=s; }
-// A camera uses EITHER host OR url, never both. Whichever the user fills in locks the other
-// (greyed + disabled) until they clear it; url wins if both somehow carry a value.
-function hostUrlExclusive(el){
-  var tr = el.closest ? el.closest('tr') : null; if(!tr) return;
-  var h = tr.querySelector('[data-f="host"]'), u = tr.querySelector('[data-f="url"]'), p = tr.querySelector('[data-f="path"]');
-  if(!h || !u) return;
-  var hv = h.value.trim()!=='', uv = u.value.trim()!=='';
-  if(uv){ h.disabled = true; u.disabled = false; }
-  else if(hv){ u.disabled = true; h.disabled = false; }
-  else { h.disabled = false; u.disabled = false; }
-  [h,u].forEach(function(x){
-    x.style.opacity = x.disabled ? '0.4' : '';
-    x.title = x.disabled ? 'A camera uses host OR url — clear the other field to edit this one.' : '';
-  });
-  // Path applies only to a host-based camera; a full URL already includes its path, so lock it out.
-  if(p){
-    p.disabled = uv;
-    p.style.opacity = uv ? '0.4' : '';
-    p.title = uv ? 'A full URL already includes its path — clear the URL to set a per-camera Path.' : '';
-  }
-}
 function val(id){ return (document.getElementById(id).value||'').trim(); }
 function msg(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
 function isIPv4(v){ return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v) && v.split('.').every(function(o){ return +o<=255; }); }
@@ -1208,13 +1282,38 @@ async function loadConfig(){
   renderForm();
   msg('cfgmsg', r && r.error ? '<span class="badge warn">FILE WARNING</span> '+esc(r.error) : '');
 }
+// Resolution presets shared by the global "Transcode defaults" and the per-camera modal.
+var RESPRESETS=['1920x1080','1280x720','854x480','640x360','640x480'];
+var RESLABEL={'1920x1080':'1920×1080 (1080p)','1280x720':'1280×720 (720p)','854x480':'854×480 (480p)','640x360':'640×360 (360p)','640x480':'640×480 (VGA 4:3)'};
+function resOpts(includeInherit){
+  var o = includeInherit ? '<option value="">(use default)</option>' : '';
+  RESPRESETS.forEach(function(r){ o+='<option value="'+r+'">'+RESLABEL[r]+'</option>'; });
+  return o+'<option value="custom">Custom…</option>';
+}
+function setResField(selId,custId,v){
+  var sel=document.getElementById(selId), cust=document.getElementById(custId);
+  v=(v||'').trim().toLowerCase();
+  if(v && RESPRESETS.indexOf(v)<0){ sel.value='custom'; cust.value=v; cust.style.display=''; }
+  else { sel.value=v; cust.value=''; cust.style.display='none'; }
+}
+function getResField(selId,custId){
+  var sel=document.getElementById(selId);
+  if(sel.value==='custom') return (document.getElementById(custId).value||'').trim().toLowerCase().replace(/\s/g,'');
+  return sel.value; // '' (inherit) or a preset
+}
+function onResSel(selId,custId){
+  var cust=document.getElementById(custId), isc=document.getElementById(selId).value==='custom';
+  cust.style.display = isc ? '' : 'none'; if(isc) cust.focus();
+}
 function renderForm(){
   document.getElementById('f-user').value = CFG.rtsp_user || '';
   document.getElementById('f-pass').value = CFG.rtsp_password || '';
   document.getElementById('f-port').value = CFG.rtsp_port || 554;
   document.getElementById('f-path').value = CFG.default_path || '';
   document.getElementById('f-hls-list').value = CFG.hls_list_size || '';
-  document.getElementById('f-tscale').value = CFG.transcode_scale || '';
+  document.getElementById('f-tscale-sel').innerHTML = resOpts(false);
+  setResField('f-tscale-sel','f-tscale-cust', CFG.transcode_scale || '1280x720');
+  document.getElementById('f-smode').value = (CFG.scale_mode==='stretch')?'stretch':'fit';
   document.getElementById('f-tfps').value = CFG.transcode_fps || '';
   document.getElementById('f-tbr').value = CFG.transcode_bitrate || '';
   var _it=document.getElementById('f-inject-token'); if(_it) _it.value = CFG.inject_token || '';
@@ -1222,10 +1321,7 @@ function renderForm(){
   var _oc=(CFG.lan_ip||'').split('.');
   document.getElementById('f-ip1').value=_oc[0]||''; document.getElementById('f-ip2').value=_oc[1]||'';
   document.getElementById('f-ip3').value=_oc[2]||''; document.getElementById('f-ip4').value=_oc[3]||'';
-  var head ='<tr><th>Name</th><th>Host</th><th>URL (override)</th><th>Path</th><th>Mode</th><th>Audio</th><th>On-demand</th><th></th></tr>';
-  document.getElementById('camrows').innerHTML = head + (CFG.cameras||[]).map(camRow).join('');
-  // Reflect host/url mutual exclusion on the freshly-rendered rows (loaded config).
-  document.querySelectorAll('#camrows tr [data-f="host"]').forEach(hostUrlExclusive);
+  renderCamsSummary();
 }
 function populateTtsEngines(){
   var sel = document.getElementById('f-tts-engine'); if(!sel) return;
@@ -1242,21 +1338,96 @@ function populateTtsEngines(){
   render([]);   // baseline (none + current) while the fetch runs
   fetch('api/tts_engines').then(function(r){return r.json();}).then(function(r){ render((r&&r.engines)||[]); }).catch(function(){});
 }
-function camRow(c,i){
-  c = c || {};
-  var av = c.audio_source || '';
-  var opts = ['','inject','inject_mix']; if(av && opts.indexOf(av)<0) opts.push(av);
-  var asel = '<select data-f="audio_source">'+opts.map(function(o){
-    return '<option value="'+esc(o)+'"'+(av===o?' selected':'')+'>'+(o||'(none)')+'</option>'; }).join('')+'</select>';
-  return '<tr>'+
-    '<td><input value="'+esc(c.name)+'" data-f="name" oninput="sanitizeName(this)" placeholder="frontporch" title="URL segment: lowercase letters, numbers, and underscore only — no spaces or capitals"></td>'+
-    '<td><input value="'+esc(c.host)+'" data-f="host" oninput="hostUrlExclusive(this)" placeholder="192.168.1.64"></td>'+
-    '<td><input value="'+esc(c.url)+'" data-f="url" oninput="hostUrlExclusive(this)" placeholder="rtsp://…"></td>'+
-    '<td><input value="'+esc(c.path)+'" data-f="path"></td>'+
-    '<td><select data-f="mode"><option'+(c.mode==='copy'?' selected':'')+'>copy</option><option'+(c.mode!=='copy'?' selected':'')+'>transcode</option></select></td>'+
-    '<td>'+asel+'</td>'+
-    '<td style="text-align:center"><input type="checkbox" data-f="on_demand"'+(c.on_demand?' checked':'')+' title="On-demand source (e.g. Frigate birdseye): expected to be idle / 404 when inactive — quiets its logs, skips the stall watchdog, and validates as Idle instead of an error"></td>'+
-    '<td><button class="btn-del" onclick="delCamRow('+i+')" title="remove camera">&#10005;</button></td></tr>';
+/* ---- Cameras: read-only summary + per-camera modal editor ---- */
+function maskUrl(u){ return String(u).replace(/(rtsp:\/\/[^:@/]+):[^@/]*@/i,'$1:***@'); }
+function renderCamsSummary(){
+  var el=document.getElementById('camlist'); if(!el) return;
+  var cams=CFG.cameras||[];
+  if(!cams.length){ el.innerHTML='<p class="sub" style="margin:0">No cameras yet &mdash; click <b>+ Add camera</b>.</p>'; return; }
+  el.innerHTML=cams.map(camSummaryRow).join('');
+}
+function camSummaryRow(c,i){
+  c=c||{};
+  var isR = c.url && /:8554\/|frigate|go2rtc|mediamtx|restream/i.test(c.url);
+  var pills = (c.url ? '<span class="cpill'+(isR?' rst':'')+'">'+(isR?'Restream':'URL')+'</span>' : '<span class="cpill">Direct</span>')+
+    '<span class="cpill">'+(c.mode==='copy'?'copy':'transcode')+'</span>';
+  if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud">'+esc(c.audio_source)+'</span>';
+  if(c.on_demand) pills+='<span class="cpill">on-demand</span>';
+  if(c.mode!=='copy' && c.scale) pills+='<span class="cpill">'+esc(String(c.scale))+'</span>';
+  var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');
+  return '<div class="camsum"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
+    '<span class="csrc">'+src+'</span>'+
+    '<span class="cact"><button onclick="openCamEditor('+i+')">Edit</button>'+
+    '<button class="del" onclick="delCam('+i+')" title="remove camera">Delete</button></span></div>';
+}
+var CAMIDX=-1;  // camera index being edited, -1 = new
+function mget(id){ return document.getElementById(id); }
+function openCamEditor(i){
+  CAMIDX=i;
+  var c=(i>=0 && CFG.cameras && CFG.cameras[i]) ? CFG.cameras[i] : {mode:'copy'};
+  mget('cammodal-title').textContent = (i>=0?'Edit camera':'Add camera');
+  mget('m-name').value=c.name||''; mget('m-host').value=c.host||''; mget('m-path').value=c.path||''; mget('m-url').value=c.url||'';
+  mget('m-mode').value=(c.mode==='copy')?'copy':'transcode';
+  mget('m-audio').value=(c.audio_source==='inject'||c.audio_source==='inject_mix')?c.audio_source:'';
+  mget('m-ondemand').checked=!!c.on_demand;
+  mget('m-buf').value=c.hls_list_size||'';
+  mget('m-res-sel').innerHTML=resOpts(true); setResField('m-res-sel','m-res-cust', c.scale||'');
+  mget('m-smode').value=(c.scale_mode==='fit'||c.scale_mode==='stretch')?c.scale_mode:'';
+  mget('m-fps').value=c.fps||''; mget('m-br').value=c.bitrate||'';
+  mget('m-err').textContent='';
+  camSrcType(c.url ? 'url' : 'host'); camModeChange();
+  mget('cammodal').classList.add('show');
+}
+function closeCamEditor(){ mget('cammodal').classList.remove('show'); }
+function camSrcType(t){
+  document.querySelectorAll('#m-srcseg button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-src')===t); });
+  var host=(t==='host');
+  mget('m-host-fld').style.display=host?'':'none';
+  mget('m-path-fld').style.display=host?'':'none';
+  mget('m-url-fld').style.display=host?'none':'';
+}
+function camSrcCur(){ var on=document.querySelector('#m-srcseg button.on'); return on?on.getAttribute('data-src'):'host'; }
+function camModeChange(){ mget('m-transcode-adv').style.display=(mget('m-mode').value==='transcode')?'':'none'; }
+function saveCamEditor(){
+  var E=function(m){ mget('m-err').textContent=m; return false; };
+  var name=(mget('m-name').value||'').trim();
+  if(!/^[a-z0-9_]+$/.test(name)) return E('Name: lowercase letters, numbers, underscore only (no spaces/capitals).');
+  if((CFG.cameras||[]).some(function(c,j){ return j!==CAMIDX && (c.name||'')===name; })) return E('A camera named "'+name+'" already exists.');
+  var srcT=camSrcCur(), host=(mget('m-host').value||'').trim(), url=(mget('m-url').value||'').trim(), path=(mget('m-path').value||'').trim();
+  if(srcT==='host'){ if(!host) return E('Enter the camera IP (Host).'); }
+  else { if(!url) return E('Enter the RTSP URL.'); }
+  var mode=(mget('m-mode').value==='copy')?'copy':'transcode';
+  var res=getResField('m-res-sel','m-res-cust');
+  if(res && !/^\d{2,4}x\d{2,4}$/.test(res)) return E('Resolution must be WIDTHxHEIGHT, e.g. 1280x720.');
+  var bufS=mget('m-buf').value, buf=parseInt(bufS,10);
+  if(bufS!=='' && !(buf>=2&&buf<=10)) return E('HLS buffer must be a whole number 2–10.');
+  var fpsS=mget('m-fps').value, fps=parseInt(fpsS,10);
+  if(fpsS!=='' && !(fps>=5&&fps<=30)) return E('Frame rate must be 5–30.');
+  var brS=mget('m-br').value, br=parseInt(brS,10);
+  if(brS!=='' && !(br>=200&&br<=20000)) return E('Bitrate cap must be 200–20000 kbps.');
+  // Build from the existing camera so unknown keys survive.
+  var base=(CAMIDX>=0 && CFG.cameras && CFG.cameras[CAMIDX])?CFG.cameras[CAMIDX]:{};
+  var c={}; for(var k in base){ if(base.hasOwnProperty(k)) c[k]=base[k]; }
+  c.name=name; c.mode=mode;
+  if(srcT==='host'){ c.host=host; delete c.url; if(path) c.path=path; else delete c.path; }
+  else { c.url=url; delete c.host; delete c.path; }
+  var au=mget('m-audio').value; if(au) c.audio_source=au; else delete c.audio_source;
+  if(mget('m-ondemand').checked) c.on_demand=true; else delete c.on_demand;
+  if(bufS!=='') c.hls_list_size=buf; else delete c.hls_list_size;
+  if(mode==='transcode'){
+    if(res) c.scale=res; else delete c.scale;
+    var sm=mget('m-smode').value; if(sm==='fit'||sm==='stretch') c.scale_mode=sm; else delete c.scale_mode;
+    if(fpsS!=='') c.fps=fps; else delete c.fps;
+    if(brS!=='') c.bitrate=br; else delete c.bitrate;
+  } else { delete c.scale; delete c.scale_mode; delete c.fps; delete c.bitrate; }
+  if(!CFG.cameras) CFG.cameras=[];
+  if(CAMIDX>=0) CFG.cameras[CAMIDX]=c; else CFG.cameras.push(c);
+  closeCamEditor(); renderCamsSummary();
+}
+function delCam(i){
+  var nm=(CFG.cameras&&CFG.cameras[i]&&CFG.cameras[i].name)||'this camera';
+  if(!confirm('Remove '+nm+'?')) return;
+  CFG.cameras.splice(i,1); renderCamsSummary();
 }
 function gatherForm(){
   // Start from the loaded config so unknown top-level keys (e.g. ha_base) survive a save.
@@ -1266,33 +1437,16 @@ function gatherForm(){
   d.rtsp_port = parseInt(val('f-port')||'554',10);
   if(val('f-path')) d.default_path = val('f-path'); else delete d.default_path;
   var hls=parseInt(val('f-hls-list'),10); if(hls>=2&&hls<=10&&hls!==4) d.hls_list_size=hls; else delete d.hls_list_size;
-  var ts=(val('f-tscale')||'').trim().toLowerCase().replace(/\s/g,''); if(/^\d{2,4}x\d{2,4}$/.test(ts)&&ts!=='1280x720') d.transcode_scale=ts; else delete d.transcode_scale;
+  var ts=getResField('f-tscale-sel','f-tscale-cust'); if(/^\d{2,4}x\d{2,4}$/.test(ts)&&ts!=='1280x720') d.transcode_scale=ts; else delete d.transcode_scale;
+  if(mget('f-smode').value==='stretch') d.scale_mode='stretch'; else delete d.scale_mode;
   var tf=parseInt(val('f-tfps'),10); if(tf>=5&&tf<=30&&tf!==15) d.transcode_fps=tf; else delete d.transcode_fps;
   var tb=parseInt(val('f-tbr'),10); if(tb>=200&&tb<=20000) d.transcode_bitrate=tb; else delete d.transcode_bitrate;
   if(val('f-inject-token')) d.inject_token = val('f-inject-token'); else delete d.inject_token;
   if(val('f-tts-engine')) d.tts_engine = val('f-tts-engine'); else delete d.tts_engine;
   var _lan=lanFromFields(); if(_lan) d.lan_ip=_lan; else delete d.lan_ip;
-  var cams = [], idx = 0;
-  document.querySelectorAll('#camrows tr').forEach(function(tr){
-    var inputs = tr.querySelectorAll('[data-f]'); if(!inputs.length) return;
-    // Start from the existing camera object so fields the form doesn't render
-    // (e.g. audio_source) are preserved instead of dropped on save.
-    var base = (CFG.cameras && CFG.cameras[idx]) || {}; idx++;
-    var c = {}; for(var k in base){ if(base.hasOwnProperty(k)) c[k]=base[k]; }
-    inputs.forEach(function(el){
-      var f=el.getAttribute('data-f');
-      if(el.type==='checkbox'){ if(el.checked) c[f]=true; else delete c[f]; return; }
-      var v=(el.value||'').trim();
-      if(v){ c[f]=v; } else { delete c[f]; }
-    });
-    if(c.url && c.path) delete c.path;  // a full URL includes its path — never save a stray path with it
-    if(c.name){ if(!c.mode) c.mode='transcode'; cams.push(c); }
-  });
-  d.cameras = cams;
+  d.cameras = (CFG.cameras||[]).map(function(c){ var o={}; for(var k in c){ if(c.hasOwnProperty(k)) o[k]=c[k]; } if(!o.mode) o.mode='transcode'; return o; });
   return d;
 }
-function addCamRow(){ CFG = gatherForm(); CFG.cameras.push({mode:'copy'}); renderForm(); }
-function delCamRow(i){ CFG = gatherForm(); CFG.cameras.splice(i,1); renderForm(); }
 async function toggleYaml(){
   if(!yamlMode){
     var r = await (await fetch('api/to-yaml',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:gatherForm()})})).json();

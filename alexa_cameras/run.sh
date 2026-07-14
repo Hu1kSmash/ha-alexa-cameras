@@ -70,44 +70,64 @@ read_config() {
   RUSER="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_user",""))' 2>/dev/null)"
   RPASS="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_password",""))' 2>/dev/null)"
   RPORT="$(python3 -c 'import yaml;print(yaml.safe_load(open("/data/config.yaml")).get("rtsp_port",554))' 2>/dev/null)"
-  # HLS buffer depth (segments in the live playlist). Lower = less lag to real-time but a smaller
-  # buffer that can stall on a slow fetch. Clamped 2-10; default 4.
-  HLS_LIST_SIZE="$(python3 -c 'import yaml
-try: v=int(yaml.safe_load(open("/data/config.yaml")).get("hls_list_size",4))
-except Exception: v=4
-print(max(2,min(10,v)))' 2>/dev/null)"
-  [ -z "$HLS_LIST_SIZE" ] && HLS_LIST_SIZE=4
-  # Transcode output controls (only affect mode: transcode): a WxH box the video is scaled *within*
-  # (aspect preserved), the output fps (which also sets the 1-second keyframe GOP), and an optional
-  # bitrate cap in kbps (0 = uncapped / quality-based). Validated + clamped here; emitted as "W H FPS BR".
-  read -r TRANSCODE_W TRANSCODE_H TRANSCODE_FPS TRANSCODE_BR <<< "$(python3 -c '
-import yaml
-try: o=yaml.safe_load(open("/data/config.yaml")) or {}
-except Exception: o={}
-s=str(o.get("transcode_scale","1280x720")).lower().replace(" ","")
-try:
-    w,h=s.split("x"); w=int(w); h=int(h)
-    if not (160<=w<=1920 and 120<=h<=1080): raise ValueError
-except Exception:
-    w,h=1280,720
-try: f=int(o.get("transcode_fps",15))
-except Exception: f=15
-f=max(5,min(30,f))
-try: b=int(o.get("transcode_bitrate",0))
-except Exception: b=0
-b=0 if b<=0 else max(200,min(20000,b))
-print(w,h,f,b)' 2>/dev/null)"
-  [ -z "$TRANSCODE_W" ] && { TRANSCODE_W=1280; TRANSCODE_H=720; TRANSCODE_FPS=15; TRANSCODE_BR=0; }
-  # One line per camera: name|host|path|mode|url
+  # One line per camera. Streaming controls (buffer / scale / scale_mode / fps / bitrate) are resolved
+  # HERE: global default (top-level keys) unless the camera sets its own override, all validated +
+  # clamped, so the bash side just uses the effective values. Fields (| separated):
+  #   name|host|path|mode|url|audio_source|on_demand|scale|scale_mode|fps|bitrate|buffer
   mapfile -t CAMLINES < <(python3 - <<'PY'
-import yaml
+import yaml, re
 try:
     o = yaml.safe_load(open("/data/config.yaml")) or {}
 except Exception as e:
     print("[config] ERROR parsing config.yaml: %s" % e)
     raise SystemExit
 d = o.get("default_path", "")
+
+def cscale(v, dflt):
+    s = str(v if v is not None else "").strip().lower().replace(" ", "")
+    m = re.match(r"^(\d{2,4})x(\d{2,4})$", s)
+    if not m:
+        return dflt
+    w, h = int(m.group(1)), int(m.group(2))
+    if not (160 <= w <= 1920 and 120 <= h <= 1080):
+        return dflt
+    return "%dx%d" % (w - w % 2, h - h % 2)          # force even (libx264)
+
+def cint(v, lo, hi, dflt):
+    try:
+        return max(lo, min(hi, int(v)))
+    except Exception:
+        return dflt
+
+def cbr(v, dflt):
+    s = str(v if v is not None else "").strip()
+    if s == "":
+        return dflt
+    try:
+        n = int(v)
+    except Exception:
+        return dflt
+    return 0 if n <= 0 else max(200, min(20000, n))
+
+def cmode(v, dflt):
+    s = str(v if v is not None else "").strip().lower()
+    return s if s in ("fit", "stretch") else dflt
+
+g_scale = cscale(o.get("transcode_scale"), "1280x720")
+g_mode  = cmode(o.get("scale_mode"), "fit")
+g_fps   = cint(o.get("transcode_fps"), 5, 30, 15)
+g_br    = cbr(o.get("transcode_bitrate"), 0)
+g_buf   = cint(o.get("hls_list_size"), 2, 10, 4)
+
+def ov(c, k):   # True if the camera sets a non-empty override for key k
+    return str(c.get(k, "")).strip() != ""
+
 for c in (o.get("cameras") or []):
+    sc  = cscale(c.get("scale"), g_scale) if ov(c, "scale") else g_scale
+    smd = cmode(c.get("scale_mode"), g_mode) if ov(c, "scale_mode") else g_mode
+    fp  = cint(c.get("fps"), 5, 30, g_fps) if ov(c, "fps") else g_fps
+    br  = cbr(c.get("bitrate"), g_br) if ov(c, "bitrate") else g_br
+    bf  = cint(c.get("hls_list_size"), 2, 10, g_buf) if ov(c, "hls_list_size") else g_buf
     print("|".join([
         str(c.get("name", "")).strip(),
         str(c.get("host", "")).strip(),
@@ -116,7 +136,7 @@ for c in (o.get("cameras") or []):
         str(c.get("url", "")).strip(),
         str(c.get("audio_source", "")).strip(),
         "1" if str(c.get("on_demand", "")).strip().lower() in ("true", "1", "yes", "on") else "",
-        str(c.get("scale", "")).strip().lower().replace(" ", ""),
+        sc, smd, str(fp), str(br), str(bf),
     ]))
 PY
 )
@@ -133,7 +153,8 @@ req_fresh() {
 # copy  = camera stream is already H.264 -> remux only (near-zero CPU)
 # transcode = source is H.265/other -> scale to 720p H.264 Baseline for Alexa
 hls_loop() {
-  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}" on_demand="${7:-}" scale="${8:-}"
+  local cam="$1" ip="$2" path="$3" mode="$4" url="$5" audio_source="${6:-}" on_demand="${7:-}"
+  local scale="${8:-1280x720}" smode="${9:-fit}" fps="${10:-15}" bitrate="${11:-0}" cbuf="${12:-4}"
   local src
   mkdir -p "$HLS/$cam"
   if [ -n "$url" ]; then
@@ -145,23 +166,21 @@ hls_loop() {
   else
     src="rtsp://${ip}:${RPORT}${path}"
   fi
-  # Transcode video pipeline, built from the global transcode_* controls (read_config) plus an
-  # optional per-camera `scale` override (WxH). Scale is aspect-preserving *within* the WxH box
-  # (force_original_aspect_ratio=decrease) with even dimensions (force_divisible_by=2) so non-16:9
-  # sources aren't stretched. fps also drives the 1-second keyframe GOP (-g/-keyint_min = fps).
-  local TW="$TRANSCODE_W" TH="$TRANSCODE_H"
-  if [ -n "$scale" ]; then
-    local cw="${scale%%x*}" ch="${scale##*x}"
-    case "$cw" in ''|*[!0-9]*) cw="" ;; esac
-    case "$ch" in ''|*[!0-9]*) ch="" ;; esac
-    [ -n "$cw" ] && [ -n "$ch" ] && { TW="$cw"; TH="$ch"; }
+  # Transcode video pipeline from the already-resolved effective values (read_config did the global-
+  # default-vs-per-camera-override + validation). scale is a validated even WxH; smode picks whether
+  # the source is fit *within* that box (aspect preserved) or stretched to it exactly. fps also drives
+  # the 1-second keyframe GOP; bitrate>0 caps peak bandwidth.
+  local TW="${scale%x*}" TH="${scale#*x}" VF
+  if [ "$smode" = "stretch" ]; then
+    VF="scale=${TW}:${TH},fps=${fps}"
+  else
+    VF="scale=${TW}:${TH}:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=${fps}"
   fi
-  local VF="scale=${TW}:${TH}:force_original_aspect_ratio=decrease:force_divisible_by=2,fps=${TRANSCODE_FPS:-15}"
   local -a X264=(-c:v libx264 -profile:v baseline -level:v 3.1 -pix_fmt yuv420p -preset veryfast \
-                 -tune zerolatency -g "${TRANSCODE_FPS:-15}" -keyint_min "${TRANSCODE_FPS:-15}" \
+                 -tune zerolatency -g "$fps" -keyint_min "$fps" \
                  -force_key_frames "expr:gte(t,n_forced*1)" -bf 0)
   local -a BRARGS=()
-  [ "${TRANSCODE_BR:-0}" -gt 0 ] 2>/dev/null && BRARGS=(-maxrate "${TRANSCODE_BR}k" -bufsize "$((TRANSCODE_BR*2))k")
+  [ "${bitrate:-0}" -gt 0 ] 2>/dev/null && BRARGS=(-maxrate "${bitrate}k" -bufsize "$((bitrate*2))k")
   local -a venc
   if [ "$mode" = "copy" ]; then
     venc=(-c:v copy)
@@ -222,7 +241,7 @@ hls_loop() {
     ffmpeg -nostdin -loglevel error -fflags nobuffer -flags low_delay \
       -rtsp_transport tcp -i "$src" ${ain[@]+"${ain[@]}"} \
       ${amap[@]+"${amap[@]}"} "${venc[@]}" -c:a aac -ar 48000 -ac 2 -b:a 64k \
-      -f hls -hls_time 1 -hls_list_size "${HLS_LIST_SIZE:-4}" \
+      -f hls -hls_time 1 -hls_list_size "${cbuf:-4}" \
       -hls_flags "delete_segments+omit_endlist+independent_segments" \
       -hls_segment_type mpegts -hls_allow_cache 0 \
       -hls_segment_filename "$HLS/$cam/seg_%05d.ts" "$HLS/$cam/stream.m3u8" \
@@ -300,10 +319,10 @@ start_workers() {
   # here guarantees a clean slate each start and also removes dirs for cameras you've since deleted.
   # (Workers are already stopped when this runs on reload; on first boot the dir is empty anyway.)
   rm -rf "$HLS"/* 2>/dev/null
-  local count=0 line name host path mode url audio_source on_demand scale
+  local count=0 line name host path mode url audio_source on_demand scale smode fps bitrate cbuf
   for line in "${CAMLINES[@]}"; do
     [ -z "$line" ] && continue
-    IFS='|' read -r name host path mode url audio_source on_demand scale <<< "$line"
+    IFS='|' read -r name host path mode url audio_source on_demand scale smode fps bitrate cbuf <<< "$line"
     [ -z "$name" ] && continue
     if [ "$audio_source" = "inject" ] || [ "$audio_source" = "inject_mix" ]; then
       mkdir -p /tmp/inject && mkfifo -m 600 "/tmp/inject/$name.pcm" 2>/dev/null
@@ -313,7 +332,7 @@ start_workers() {
     else
       echo "Starting camera '$name' (${url:-$host}, mode=$mode${audio_source:+, audio=$audio_source})"
     fi
-    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" "$scale" & WPIDS+=($!)
+    hls_loop "$name" "$host" "$path" "$mode" "$url" "$audio_source" "$on_demand" "$scale" "$smode" "$fps" "$bitrate" "$cbuf" & WPIDS+=($!)
     snap_loop "$name" & WPIDS+=($!)
     count=$((count + 1))
   done

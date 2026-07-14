@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.18.0
+
+- **Cameras configuration reworked into a summary + per-camera editor dialog** — the inline table is
+  gone. The Cameras panel is now a **read-only summary** (one line per camera with its config pills);
+  click **Edit** (or **+ Add camera**) to open a modal that sets everything with **dropdowns and
+  validation** — source (Direct IP or full RTSP URL, as a toggle), mode, audio, on-demand, and an
+  **Advanced** section for per-camera overrides. No YAML required for advanced options (**View as
+  YAML** stays for power users).
+- **Per-camera overrides are now first-class** for **HLS buffer**, and (transcode only) **resolution**
+  (preset dropdown + Custom), **scale mode**, **frame rate**, and **bitrate cap**. Each is blank by
+  default and inherits the corresponding global default; all resolved + validated in one place.
+- **New `scale_mode`** setting (global default + per-camera): **`fit`** (preserve aspect, default) vs
+  **`stretch`** (force exact dimensions).
+
 ## 1.17.0
 
 - **New transcode output controls** (Configuration → **Streaming (advanced)**), for `mode: transcode`
