@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.10
+
+- Docs: replaced the old (stale) birdseye Validate screenshot with a current one showing an on-demand
+  source at rest — both **Source** and **Output** read a blue **Idle** (the add-on skips on-demand
+  cameras so probing never wakes them). Added a lead-in that explains the image and reinforces ticking
+  **On-demand** on birdseye. The old image showed a red/amber error state that no longer occurs.
+
 ## 1.16.9
 
 - Docs: correct the "wedged Frigate" diagnosis to match what's actually observed — a flaky/overloaded

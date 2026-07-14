@@ -470,7 +470,13 @@ smooth while the Echo isn't, spend your effort on the Echo's Wi-Fi, not the add-
 >
 > (On a *normal, always-on* camera — not on-demand — red/amber here is always a real problem worth chasing.)
 
-![Validate streams — an idle Frigate birdseye (on-demand): Source times out (red), Output warns (amber)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye.png)
+**Tick On-demand on birdseye** (and on any source that's idle/absent when inactive) and this is exactly
+how it should read on the Validate tab — both **Source** and **Output** show a calm blue **Idle**,
+because the add-on **skips on-demand cameras so probing never wakes them**. A **Check stream** button
+lets you wake it and test on purpose. No red, no amber — for an on-demand source, idle *is* the expected
+resting state:
+
+![Validate streams — an on-demand Frigate birdseye at rest: both Source and Output read a blue "Idle" because the add-on skips on-demand cameras so validating never wakes them, and a "Check stream" button lets you probe it on purpose](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/validate-stream-birdseye-idle.png)
 
 ---
 
