@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.2
+
+- Validate streams polish: the config ovals are back to a **uniform width** (they'd shrunk to their
+  text), and the action button is **smaller/lighter** — the on-demand one is now just **"Check stream"**.
+
 ## 1.13.1
 
 - Validate streams polish: the action button now sits **before** the camera name, the config columns

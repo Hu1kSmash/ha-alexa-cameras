@@ -743,7 +743,7 @@ INDEX_HTML = r"""<!doctype html>
   table.cams td.src { font-family:ui-monospace,monospace; font-size:.78rem; opacity:.75; word-break:break-all; }
   table.cams input, table.cams select { width:100%; font:inherit; font-size:.82rem; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
   .mode { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); }
-  .cfg { display:grid; grid-template-columns:84px 78px 84px 72px 84px; gap:6px; align-items:center; justify-items:center; }
+  .cfg { display:grid; grid-template-columns:repeat(5,84px); gap:6px; align-items:center; }
   .cfg .c { font-size:.72rem; padding:1px 6px; border-radius:999px; border:1px solid var(--line); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
   .cfg .c.rst { border-color:#2e9d6e; color:#2e9d6e; }
   .cfg .c.off { opacity:.4; border-style:dashed; cursor:default; }
@@ -752,6 +752,7 @@ INDEX_HTML = r"""<!doctype html>
   button.primary { font:inherit; font-weight:600; padding:8px 15px; border-radius:9px; cursor:pointer; border:1px solid #3b82f6; background:#3b82f6; color:#fff; }
   button.primary:hover { background:#2563eb; border-color:#2563eb; }
   button { font:inherit; padding:6px 12px; border-radius:8px; cursor:pointer; border:1px solid var(--line); background:transparent; color:inherit; }
+  .vbtn { font-size:.78rem; padding:4px 11px; border-radius:7px; white-space:nowrap; }
   p.sub { margin:0 0 12px; opacity:.75; font-size:.9rem; }
   .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
   @media (max-width:640px){ .cfg-grid { grid-template-columns:1fr; } }
@@ -1180,8 +1181,8 @@ function renderValidate(){
     '<span class="c">Path</span><span class="c">Audio</span></div></div>';
   var cards = CAMS.map(function(c){
     var btn = c.on_demand
-      ? '<button onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check, which briefly wakes the on-demand source (e.g. Frigate birdseye)">Check on-demand stream</button>'
-      : '<button onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
+      ? '<button class="vbtn" onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check for this on-demand camera, which briefly wakes the source (e.g. Frigate birdseye)">Check stream</button>'
+      : '<button class="vbtn" onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
     var cfg = '<div class="cfg">'+
       (c.on_demand ? cfgc('yes','','Connects only while watched; skipped by Validate all so it isn\'t woken') : cfgc('–','off','Always-on camera'))+
       cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
