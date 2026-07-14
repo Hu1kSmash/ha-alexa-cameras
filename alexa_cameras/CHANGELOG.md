@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1
+
+- Validate streams polish: the action button now sits **before** the camera name, the config columns
+  are **centered** under their headers, and the columns are reordered with **On-demand first**
+  (On-demand · Mode · Source · Path · Audio).
+
 ## 1.13.0
 
 - **Validate streams config badges are now aligned columns with a header.** The per-camera
