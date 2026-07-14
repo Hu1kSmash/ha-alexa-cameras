@@ -495,11 +495,13 @@ while true; do
     log "[reload] configuration changed — restarting camera workers"
     stop_workers
     start_workers
-    pkill -f '/injector.py' 2>/dev/null   # respawns via its loop, re-reading inject cameras
     # Re-emit the banner + config summary so a save gives a clean visual break in the log
     # and the latest effective config/diag is always right there to point support at.
+    # Print this BEFORE restarting the injector so its kill/respawn noise lands after the
+    # banner (in the injector section) rather than racing into the middle of the art.
     banner reloaded
     print_diag
+    pkill -f '/injector.py' 2>/dev/null   # respawns via its loop, re-reading inject cameras
   fi
   # Keep the log file from growing without bound (tee -a re-seeks to EOF).
   [ "$(stat -c%s "$LOG" 2>/dev/null || echo 0)" -gt 2000000 ] && : > "$LOG"
