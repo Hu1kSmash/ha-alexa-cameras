@@ -707,6 +707,32 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps({"data": yaml.safe_load(body.get("yaml", "")) or {}, "error": None}))
             except yaml.YAMLError as e:
                 return self._send(200, json.dumps({"data": None, "error": str(e)}))
+        if path == "api/say":
+            # Quick audio-injection test from the Validate page: inject a fixed spoken message into
+            # this camera's stream via the local injector (:8790). (Automations still use the /say
+            # control API directly; this is just a one-click check.)
+            cfg, _ = load_config()
+            cams = cfg.get("cameras", []) or []
+            name = parse_qs(urlparse(self.path).query).get("cam", [""])[0]
+            cam = next((c for c in cams if c.get("name") == name), None)
+            if not cam:
+                return self._send(200, json.dumps({"ok": False, "error": f"No camera '{name}'."}))
+            if str(cam.get("audio_source", "")).strip() not in ("inject", "inject_mix"):
+                return self._send(200, json.dumps({"ok": False, "error": "This camera has no audio injection set."}))
+            payload = {"cam": name, "text": f"Audio injection test on the {name} camera."}
+            tok = str(cfg.get("inject_token", "")).strip()
+            if tok:
+                payload["token"] = tok
+            try:
+                req = urllib.request.Request("http://127.0.0.1:8790/say",
+                    data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=25) as r:
+                    return self._send(200, json.dumps({"ok": True, "resp": json.load(r)}))
+            except urllib.error.HTTPError as e:
+                return self._send(200, json.dumps({"ok": False,
+                    "error": f"injector {e.code}: {e.read().decode('utf-8', 'replace')[:200]}"}))
+            except Exception as e:
+                return self._send(200, json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
         return self._send(404, json.dumps({"error": "not found"}))
 
 
@@ -747,7 +773,9 @@ INDEX_HTML = r"""<!doctype html>
   .cfg .c { font-size:.72rem; padding:1px 6px; border-radius:999px; border:1px solid var(--line); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
   .cfg .c.rst { border-color:#2e9d6e; color:#2e9d6e; }
   .cfg .c.off { opacity:.4; border-style:dashed; cursor:default; }
-  .vhead { display:flex; align-items:center; gap:10px; padding:2px 0 8px; }
+  .cfg .c.aud { cursor:pointer; border-color:#7c5cff; color:#7c5cff; }
+  .cfg .c.aud:hover { background:rgba(124,92,255,.14); }
+  .vhead { display:flex; align-items:center; gap:10px; padding:2px 15px 8px; }  /* right pad matches .card (14px + 1px border) so header columns align over the pills */
   .vhead .cfg .c { border:none; opacity:.55; font-weight:600; padding:0 6px; cursor:default; }
   button.primary { font:inherit; font-weight:600; padding:8px 15px; border-radius:9px; cursor:pointer; border:1px solid #3b82f6; background:#3b82f6; color:#fff; }
   button.primary:hover { background:#2563eb; border-color:#2563eb; }
@@ -936,7 +964,7 @@ INDEX_HTML = r"""<!doctype html>
 
   <section id="tab-validate" hidden>
     <div class="row" style="margin-bottom:10px">
-      <p class="sub" style="margin:0; flex:1">Checks each camera end to end: the upstream <b>RTSP source</b> (codec vs. mode) and this add-on's <b>HLS output</b> (live and Alexa-decodable).</p>
+      <p class="sub" style="margin:0; flex:1">Checks each camera end to end: the upstream <b>RTSP source</b> (codec vs. mode) and this add-on's <b>HLS output</b> (live and Alexa-decodable). The config columns show how the add-on read each camera &mdash; <b>tip:</b> click a purple <b>inject</b>/<b>inject_mix</b> pill to fire a quick test message into that camera's audio.</p>
       <button class="primary" onclick="validateAll()">Validate all</button>
     </div>
     <div id="list">Loading&hellip;</div>
@@ -1188,7 +1216,11 @@ function renderValidate(){
       cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
       cfgc(c.source_label||'—', c.source_label==='Restream'?'rst':'', c.source_why||'')+
       cfgc(c.path_label||'—', '', c.path_why||'')+
-      (c.audio ? cfgc(c.audio, '', 'Alexa announcements play through this camera\'s audio track (see Audio injection)') : cfgc('–','off','No audio injection on this camera'))+
+      (c.audio ?
+        ((c.audio==='inject'||c.audio==='inject_mix')
+          ? '<span class="c aud" title="Click to inject a test message into this camera\'s stream — then view the camera on an Echo Show to hear it" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio)+'</span>'
+          : cfgc(c.audio, '', 'audio: '+esc(c.audio)))
+        : cfgc('–','off','No audio injection on this camera'))+
     '</div>';
     return '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'>'+
       '<div class="row">'+btn+'<span class="name">'+esc(c.name)+'</span>'+
@@ -1214,6 +1246,16 @@ async function validateCam(name, force){
     catch(e){ setRes(name+'-'+kinds[i], {status:'error', msg:String(e)}); } }
 }
 async function validateAll(){ var cards=document.querySelectorAll('.card[data-cam]'); for(var i=0;i<cards.length;i++){ await validateCam(cards[i].getAttribute('data-cam')); } }
+async function sayTest(name, el){
+  var orig=el.textContent, ot=el.title;
+  el.textContent='…'; el.style.pointerEvents='none';
+  try{
+    var r=await (await fetch('api/say?cam='+encodeURIComponent(name), {method:'POST'})).json();
+    if(r.ok){ el.textContent='sent ✓'; el.title='Test audio injected into '+name+' — view it on an Echo Show to hear it'; }
+    else { el.textContent='failed'; el.title=r.error||'failed'; }
+  }catch(e){ el.textContent='failed'; el.title=String(e); }
+  setTimeout(function(){ el.textContent=orig; el.title=ot; el.style.pointerEvents=''; }, 2800);
+}
 /* ---------- Advanced diagnostics (hidden page) ---------- */
 var DBG_METRICS=[
   ['rate','Real-time output rate','Content produced per wall-second on this add-on\'s HLS output. About <b>1&times;</b> is healthy; well under 1&times; means the stream is falling behind real-time (starved), so Alexa opens it slowly or it stutters.'],

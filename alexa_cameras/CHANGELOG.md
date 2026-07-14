@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.0
+
+- **Click an `inject` / `inject_mix` audio pill on the Validate page to fire a quick test** — the
+  add-on injects a fixed spoken message straight into that camera's stream via the injector, so you
+  can sanity-check audio injection in one click (view the camera on an Echo to hear it). Automations
+  still use the `/say` control API directly; this is just a fast manual check.
+- Fixed the Validate column **headers not lining up over the pills** (the header row was missing the
+  card's horizontal padding).
+
 ## 1.13.2
 
 - Validate streams polish: the config ovals are back to a **uniform width** (they'd shrunk to their

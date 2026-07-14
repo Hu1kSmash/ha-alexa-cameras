@@ -261,7 +261,9 @@ spot a camera interpreted differently than the rest. The columns:
   Frigate/go2rtc hostname, or port `8554`), or **Direct URL** (a full RTSP URL used as-is).
 - **Path** — **default** (the shared *Default RTSP path*), **override** (a per-camera Path), or
   **in URL** (baked into a full URL).
-- **Audio** — `inject` / `inject_mix`, or `–` if none.
+- **Audio** — `inject` / `inject_mix`, or `–` if none. **Click a highlighted `inject`/`inject_mix`
+  pill to fire a quick test message into that camera's audio** (then view the camera on an Echo to
+  hear it) — a fast sanity-check without setting up a `rest_command`.
 - **On-demand** — `yes` / `–`.
 
 Hover any badge for the specifics (e.g. *why* Source matched Restream, or the exact Path used).
