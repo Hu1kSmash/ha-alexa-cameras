@@ -363,16 +363,16 @@ def source_kind(cam, cfg):
             port = None
         lan = str(cfg.get("lan_ip", "")).strip().lower()
         if lan and h == lan:
-            return {"label": "Restream", "why": "URL points at your HA host (lan_ip) — a local restream"}
+            return {"label": "restream", "why": "URL points at your HA host (lan_ip) — a local restream"}
         if h in ("127.0.0.1", "localhost", "::1"):
-            return {"label": "Restream", "why": "URL points at localhost — a local restream"}
+            return {"label": "restream", "why": "URL points at localhost — a local restream"}
         if any(k in h for k in ("frigate", "go2rtc", "mediamtx", "restream")):
-            return {"label": "Restream", "why": f"URL host '{h}' looks like a go2rtc/Frigate restreamer"}
+            return {"label": "restream", "why": f"URL host '{h}' looks like a go2rtc/Frigate restreamer"}
         if port == 8554:
-            return {"label": "Restream", "why": "URL uses port 8554 (go2rtc/mediamtx restream port)"}
-        return {"label": "Direct URL", "why": "full RTSP URL used as-is (not a recognized local restream)"}
+            return {"label": "restream", "why": "URL uses port 8554 (go2rtc/mediamtx restream port)"}
+        return {"label": "direct url", "why": "full RTSP URL used as-is (not a recognized local restream)"}
     if host:
-        return {"label": "Direct", "why": "connects straight to the camera's IP using the RTSP defaults"}
+        return {"label": "direct", "why": "connects straight to the camera's IP using the RTSP defaults"}
     return {"label": "—", "why": ""}
 
 
@@ -771,12 +771,17 @@ class Handler(BaseHTTPRequestHandler):
             def cam_info(c):
                 sk = source_kind(c, cfg)
                 pk = path_kind(c, cfg)
+                adv = ["%s=%s" % (lab, c[k]) for k, lab in
+                       (("scale", "resolution"), ("scale_mode", "scale mode"), ("fps", "fps"),
+                        ("bitrate", "bitrate"), ("hls_list_size", "buffer"))
+                       if str(c.get(k, "")).strip()]
                 return {
                     "name": c.get("name", ""), "mode": c.get("mode", ""),
                     "audio": str(c.get("audio_source", "")).strip(),
                     "on_demand": is_on_demand(c),
                     "source_label": sk["label"], "source_why": sk["why"],
                     "path_label": pk["label"], "path_why": pk["why"],
+                    "advanced": bool(adv), "advanced_why": ", ".join(adv),
                     "source": mask(camera_source(c, cfg))}
             return self._send(200, json.dumps([cam_info(c) for c in cams]))
         if path.startswith("api/validate/"):
@@ -892,9 +897,10 @@ INDEX_HTML = r"""<!doctype html>
   table.cams td.src { font-family:ui-monospace,monospace; font-size:.78rem; opacity:.75; word-break:break-all; }
   table.cams input, table.cams select { width:100%; font:inherit; font-size:.82rem; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:transparent; color:inherit; }
   .mode { font-size:.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line); }
-  .cfg { display:grid; grid-template-columns:repeat(5,84px); gap:6px; align-items:center; }
+  .cfg { display:grid; grid-template-columns:repeat(6,84px); gap:6px; align-items:center; }
   .cfg .c { font-size:.72rem; padding:1px 6px; border-radius:999px; border:1px solid var(--line); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:help; }
   .cfg .c.rst { border-color:#2e9d6e; color:#2e9d6e; }
+  .cfg .c.adv { border-color:#c2760c; color:#c2760c; background:rgba(194,118,12,.13); }
   .cfg .c.off { opacity:.4; border-style:dashed; cursor:default; }
   .cfg .c.aud { cursor:pointer; border-color:#7c5cff; color:#7c5cff; }
   .cfg .c.aud:hover { background:rgba(124,92,255,.14); }
@@ -1395,14 +1401,14 @@ function renderCamsSummary(){
 function camSummaryRow(c,i){
   c=c||{};
   var isR = c.url && /:8554\/|frigate|go2rtc|mediamtx|restream/i.test(c.url);
-  var pills = (c.url ? '<span class="cpill'+(isR?' rst':'')+'">'+(isR?'Restream':'URL')+'</span>' : '<span class="cpill">Direct</span>')+
+  var pills = (c.url ? '<span class="cpill'+(isR?' rst':'')+'">'+(isR?'restream':'url')+'</span>' : '<span class="cpill">direct</span>')+
     '<span class="cpill">'+(c.mode==='copy'?'copy':'transcode')+'</span>';
   if(c.audio_source==='inject'||c.audio_source==='inject_mix') pills+='<span class="cpill aud" style="cursor:pointer" title="Click to inject a test announcement into this camera (view it on an Echo to hear it)" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio_source)+'</span>';
   pills+= c.on_demand ? '<span class="cpill">on-demand</span>' : '<span class="cpill on">always-on</span>';
   var adv=[];
   [['scale','resolution'],['scale_mode','scale mode'],['fps','fps'],['bitrate','bitrate'],['hls_list_size','buffer']].forEach(function(p){
     if(String(c[p[0]]!=null?c[p[0]]:'').trim()!=='') adv.push(p[1]+'='+c[p[0]]); });
-  if(adv.length) pills+='<span class="cpill adv" title="Custom advanced settings (defaults overridden): '+esc(adv.join(', '))+'">Advanced</span>';
+  if(adv.length) pills+='<span class="cpill adv" title="Custom advanced settings (defaults overridden): '+esc(adv.join(', '))+'">advanced</span>';
   var src = c.url ? esc(maskUrl(c.url)) : (c.host ? esc(c.host) : '<span style="opacity:.5">(no source)</span>');
   var chg = (JSON.stringify(c) !== ORIGCAMS[c.name||'']) ? ' changed' : '';   // added or modified since last save
   return '<div class="camsum'+chg+'"><span class="cname">'+esc(c.name||'(unnamed)')+'</span>'+pills+
@@ -1549,7 +1555,7 @@ async function loadLogs(){
 function cfgc(v,cls,title){ return '<span class="c'+(cls?' '+cls:'')+'"'+(title?' title="'+esc(title)+'"':'')+'>'+esc(v)+'</span>'; }
 function cfgHead(){ return '<div class="cfg">'+
   '<span class="c">On-demand</span><span class="c">Mode</span><span class="c">Source</span>'+
-  '<span class="c">Path</span><span class="c">Audio</span></div>'; }
+  '<span class="c">Path</span><span class="c">Audio</span><span class="c">Advanced</span></div>'; }
 // interactive=true (Validate) makes the inject/inject_mix pill clickable to fire a test message;
 // on the Overview it's purely informational.
 function cfgPills(c, interactive){
@@ -1566,9 +1572,10 @@ function cfgPills(c, interactive){
   return '<div class="cfg">'+
     (c.on_demand ? cfgc('yes','','Connects only while watched; skipped by Validate all so it isn\'t woken') : cfgc('–','off','Always-on camera'))+
     cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
-    cfgc(c.source_label||'—', c.source_label==='Restream'?'rst':'', c.source_why||'')+
+    cfgc(c.source_label||'—', c.source_label==='restream'?'rst':'', c.source_why||'')+
     cfgc(c.path_label||'—', '', c.path_why||'')+
     audio+
+    (c.advanced ? cfgc('advanced','adv','Custom advanced settings (defaults overridden): '+esc(c.advanced_why||'')) : cfgc('–','off','Standard settings — no per-camera overrides'))+
   '</div>';
 }
 function renderValidate(){

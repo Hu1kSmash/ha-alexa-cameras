@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.19.3
+
+- Pill labels lowercased for consistency: **Source** (`direct` / `restream` / `url`) and the
+  **`advanced`** pill now match the other lowercase pills (copy, transcode, inject_mix, on-demand).
+- The **Advanced** indicator (a camera has per-camera overrides) now also shows on the **Overview** and
+  **Validate** config columns — a new "Advanced" column — not just the Configuration summary.
+
 ## 1.19.2
 
 - Camera summary: a camera with any per-camera **Advanced override** (resolution / scale mode / fps /
