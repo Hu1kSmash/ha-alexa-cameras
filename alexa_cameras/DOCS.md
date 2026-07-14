@@ -255,7 +255,11 @@ on the add-on's own output. Per camera it reports:
 - **Source** — ffprobes the camera's RTSP feed and checks its codec/profile against the camera's
   `mode` — e.g. it flags an H.265 / H.264-**High** source left on `copy`.
 - **Output** — confirms the add-on's `:8888` HLS is live and decodable H.264 Baseline (what Alexa
-  actually opens).
+  actually opens). When the stream is live it also reports the **live-view latency** —
+  e.g. *"Alexa live view ≈ 8s behind real-time · 4 seg × 2.0s"* — measured straight from the
+  playlist's segment durations (in `copy` mode each segment is one **keyframe interval**, so
+  `4 × 2.0s ≈ 8s` of buffer). Lower it with **HLS buffer segments** (Configuration → Streaming) or by
+  shortening the camera's sub-stream keyframe interval to ~1s.
 
 Each camera card also shows **how the add-on read its config**, in aligned columns under a header
 (**Mode · Source · Path · Audio · On-demand**) — so you can scan straight down a column and instantly

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.2
+
+- **Validate streams now shows live-view latency** on each camera's **Output** check —
+  e.g. *"Alexa live view ≈ 8s behind real-time · 4 seg × 2.0s"*. It's measured from the playlist's
+  own `#EXTINF` segment durations (no extra probing), so it reflects reality: in `copy` mode each
+  segment is one source **keyframe interval**, and their sum is ~how far behind real-time Alexa
+  starts. Makes it obvious whether to lower **HLS buffer segments** or shorten the camera's keyframe
+  interval.
+
 ## 1.15.1
 
 - Moved the **Streaming (advanced)** panel to the **bottom** of the Configuration form (after Audio

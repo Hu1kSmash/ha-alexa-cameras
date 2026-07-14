@@ -338,6 +338,20 @@ def _get_playlist(url, timeout=6):
         return r.status, r.read().decode("utf-8", "replace")
 
 
+def playlist_buffer(body):
+    """How far behind real-time the live view sits, straight from the playlist we already
+    fetched. Sum of the #EXTINF segment durations = the buffered wall-time, and Alexa (like
+    most HLS players) starts near the *back* of that buffer — so this is ~the lag a viewer
+    sees. Each segment's length is the source keyframe interval in copy mode (segments are
+    only cut at a keyframe), or ~hls_time when we transcode. Returns a dict or None."""
+    durs = [float(x) for x in re.findall(r"#EXTINF:([0-9.]+)", body or "")]
+    if not durs:
+        return None
+    total = sum(durs)
+    return {"secs": round(total, 1), "segs": len(durs),
+            "seg_len": round(total / len(durs), 1)}
+
+
 def check_output(cam):
     name = cam.get("name", "")
     playlist = f"http://127.0.0.1:{HLS_PORT}/{name}/stream.m3u8"
@@ -370,10 +384,11 @@ def check_output(cam):
     except Exception:
         body2 = body1
     advancing = seq(body2) is not None and seq(body1) is not None and seq(body2) > seq(body1)
+    lat = playlist_buffer(body2 if ".ts" in body2 else body1)
     stream, err = ffprobe_streams(playlist, rtsp=False, timeout=12)
     if err:
         return {"status": "warn", "detail": "live" if advancing else "stale",
-                "msg": f"Serving, but a segment didn't probe cleanly: {err}."}
+                "msg": f"Serving, but a segment didn't probe cleanly: {err}.", "latency": lat}
     copy_ok, label = classify(stream)
     if not advancing:
         if is_on_demand(cam):
@@ -382,11 +397,13 @@ def check_output(cam):
                            "(expected). It resumes when the source is active again."}
         return {"status": "warn", "detail": label,
                 "msg": "Serving, but the playlist is not advancing — ffmpeg may be "
-                       "restarting. Check the Logs tab."}
+                       "restarting. Check the Logs tab.", "latency": lat}
     if not copy_ok:
         return {"status": "warn", "detail": label,
-                "msg": "Live, but OUTPUT is not H.264 Baseline/Main — Alexa may show black."}
-    return {"status": "ok", "detail": label, "msg": "Output is live and Alexa-decodable H.264."}
+                "msg": "Live, but OUTPUT is not H.264 Baseline/Main — Alexa may show black.",
+                "latency": lat}
+    return {"status": "ok", "detail": label,
+            "msg": "Output is live and Alexa-decodable H.264.", "latency": lat}
 
 
 def check_internal(cam):
@@ -825,6 +842,7 @@ INDEX_HTML = r"""<!doctype html>
   .idle { background:rgba(59,130,246,.16); color:#2563eb; }
   .pending { opacity:.6; }
   .detail { font-family:ui-monospace,monospace; font-size:.8rem; opacity:.85; }
+  .lat { font-size:.78rem; opacity:.8; margin-top:3px; cursor:help; }
   .pline { margin-bottom:12px; }
   .prow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .plabel { font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:2px 9px; border-radius:999px; border:1px solid var(--line); }
@@ -1263,7 +1281,10 @@ function badge(s){ return '<span class="badge '+s+'">'+s.toUpperCase()+'</span>'
 function badgeText(s,t){ return '<span class="badge '+s+'">'+esc(t)+'</span>'; }
 function row(k,kind){ return '<div class="res" id="res-'+kind+'"><div class="k">'+k+'</div><div class="v" id="v-'+kind+'"><span class="pending">not checked</span></div></div>'; }
 function setRes(id,r){ var v=document.getElementById('v-'+id); if(!v) return;
-  v.innerHTML = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>'; }
+  var h = badge(r.status)+(r.detail?' <span class="detail">'+esc(r.detail)+'</span>':'')+' <span>'+esc(r.msg||'')+'</span>';
+  if(r.latency){ var L=r.latency;
+    h += '<div class="lat" title="Alexa starts near the back of the HLS buffer, so this is roughly how far behind real-time the live view sits. Each segment is one keyframe interval in copy mode. Lower it with HLS buffer segments (Configuration → Streaming), or shorten the camera\'s sub-stream keyframe interval to ~1s.">⏱ Alexa live view ≈ '+L.secs+'s behind real-time · '+L.segs+' seg × '+L.seg_len+'s</div>'; }
+  v.innerHTML = h; }
 function setPending(id){ var v=document.getElementById('v-'+id); if(v) v.innerHTML='<span class="pending">checking&hellip;</span>'; }
 async function validateCam(name, force){
   showTab('validate');
