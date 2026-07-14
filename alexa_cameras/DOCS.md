@@ -313,8 +313,6 @@ with the math shown, and — when there's headroom — a **Tune** step to cut it
 
 ![The Output check's latency breakdown for a live camera: Detected (segment length, and the camera I-frame interval that sets it), Buffer (segment count), Latency (the resulting lag with the math shown — e.g. 4 seg × 2s ≈ 8s), and Tune (how to cut it — shorten the camera's I-frame interval and/or lower the HLS buffer)](https://raw.githubusercontent.com/Hu1kSmash/ha-alexa-cameras/main/docs/images/stream-output.png)
 
-Here's the whole model behind those rows, because it generates a lot of questions:
-
 **Alexa plays HLS, and HLS is a rolling buffer of little video files ("segments").** The player
 starts near the **back** of that buffer, so how far behind real-time you are is simply:
 

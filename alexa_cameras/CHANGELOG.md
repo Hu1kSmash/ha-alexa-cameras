@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.16.8
+
+- Docs: drop a redundant transition sentence in the Live-view latency section.
+
 ## 1.16.7
 
 - Docs: added a screenshot of the Output check's latency breakdown (Detected / Buffer / Latency /
