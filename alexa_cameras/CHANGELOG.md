@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.15.1
+
+- Moved the **Streaming (advanced)** panel to the **bottom** of the Configuration form (after Audio
+  injection), so the everyday settings come first and the rarely-touched buffer tuning is last. Docs
+  reordered to match. No behavior change.
+
 ## 1.15.0
 
 - **New `hls_list_size` setting (Configuration → Streaming) to tune live-view latency.** It controls

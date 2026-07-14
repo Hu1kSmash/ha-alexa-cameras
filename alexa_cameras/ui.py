@@ -937,12 +937,6 @@ INDEX_HTML = r"""<!doctype html>
           <label>Default RTSP path<input id="f-path" type="text" placeholder="/cam/realmonitor?channel=1&amp;subtype=1"></label>
         </div>
       </div>
-      <div class="panel"><h2>Streaming (advanced)</h2>
-        <div class="cfg-grid">
-          <label>HLS buffer segments<input id="f-hls-list" type="number" min="2" max="10" placeholder="4"></label>
-        </div>
-        <p class="sub" style="margin:6px 0 0">How many short segments Alexa buffers before playing. <b>Lower = less lag</b> (Alexa starts closer to real&#8209;time), but a smaller buffer can <b>stall</b> on a slow fetch. Default <b>4</b>; try <b>3</b> then <b>2</b> to trim latency, watching for stutters. Each segment is as long as your camera's keyframe interval, so <b>1&#8209;second keyframes</b> on the sub stream are the bigger win.</p>
-      </div>
       <div class="panel"><h2>Home Assistant IP (required)</h2>
         <p class="sub" style="margin:0 0 4px">The Home Assistant server's internal (private) IPv4 address on your LAN &mdash; four numbers, <b>not a hostname</b>.</p>
         <div class="iprow">
@@ -967,6 +961,12 @@ INDEX_HTML = r"""<!doctype html>
           <label>Default TTS engine<select id="f-tts-engine"><option value="">(none)</option></select></label>
         </div>
         <p class="sub" style="margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line)"><b>Note:</b> The control port defaults to <code>8790</code>; change it (or its host mapping) under the add-on's <b>Network</b> settings if you need to.</p>
+      </div>
+      <div class="panel"><h2>Streaming (advanced)</h2>
+        <div class="cfg-grid">
+          <label>HLS buffer segments<input id="f-hls-list" type="number" min="2" max="10" placeholder="4"></label>
+        </div>
+        <p class="sub" style="margin:6px 0 0">How many short segments Alexa buffers before playing. <b>Lower = less lag</b> (Alexa starts closer to real&#8209;time), but a smaller buffer can <b>stall</b> on a slow fetch. Default <b>4</b>; try <b>3</b> then <b>2</b> to trim latency, watching for stutters. Each segment is as long as your camera's keyframe interval, so <b>1&#8209;second keyframes</b> on the sub stream are the bigger win.</p>
       </div>
     </div>
     <div id="cfgyaml" hidden><textarea id="yamlbox" spellcheck="false"></textarea></div>

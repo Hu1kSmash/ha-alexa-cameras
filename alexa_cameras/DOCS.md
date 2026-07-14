@@ -99,12 +99,6 @@ full `url` ignores these and uses whatever is in that URL.)
 | **Port** (`rtsp_port`) | No | The network port your cameras use for RTSP. This is almost always **`554`** (the industry standard), so if you've never deliberately changed it, leave it at 554. Only change it if your camera or NVR documentation lists a different RTSP port. |
 | **Default RTSP path** (`default_path`) | No | The last part of the RTSP link — everything after the camera's IP and port — that tells the camera **which** video feed to send. Most cameras offer two: a high-resolution **main** stream and a lower-resolution **sub** stream, and the exact path text differs by brand. This value is used for every camera that doesn't set its own **Path**, so if all your cameras are the same brand you set it once here. The shipped default `/cam/realmonitor?channel=1&subtype=1` is the Amcrest/Dahua **sub-stream** — low-res, which is perfect for the small Echo Show screen and usually already H.264 (so `copy` works). Don't know yours? See the **Finding your camera's RTSP path** section below — you can discover it with VLC or the camera's web page. |
 
-### Streaming (advanced)
-
-| Field | Required | Description |
-|---|---|---|
-| **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s. Leave this blank to use the default of 4. |
-
 ### Home Assistant IP
 
 | Field | Required | Description |
@@ -136,6 +130,12 @@ Optional — for announcing *through* a camera (pair with a camera's **Audio** s
 | **Control API token** (`inject_token`) | No (recommended) | A password **you make up** to protect the audio-announcement API (the `POST :8790/say` endpoint that plays sound through a camera). Anything on your network that can reach that endpoint could otherwise play audio through your cameras, so set a long random string here and send the **same** value on every call (HTTP header `X-Inject-Token`, JSON field `token`, or `?token=` in the URL) — a wrong or missing value gets a **403**. This is unrelated to your camera or Home Assistant passwords; you invent it. Leave it blank only for a quick local test. |
 | **Default TTS engine** (`tts_engine`) | No | Which **text-to-speech voice** Home Assistant uses when you send a `{"text": "…"}` announcement and let the add-on speak it. It's the entity ID of a TTS engine you've set up in Home Assistant under **Settings → Voice assistants** — for example `tts.google_en_com`. The Configuration form gives you a **dropdown** of the engines you already have installed, so you don't have to type or guess it. Only needed for the *text* mode of audio injection (not when you play a ready-made audio URL). |
 | `ha_base` *(advanced, YAML only)* | No | Advanced, rarely changed — there's no form field for it. The web address the add-on uses to fetch audio that Home Assistant generates for `{"text": …}` announcements. Defaults to `http://homeassistant:8123` (Home Assistant's internal hostname), which works for almost every install. Only set this if your Home Assistant isn't reachable at that address. |
+
+### Streaming (advanced)
+
+| Field | Required | Description |
+|---|---|---|
+| **HLS buffer segments** (`hls_list_size`) | No | How many segments Alexa buffers before it starts playing — i.e. how far **behind real-time** the live view sits. Alexa (like most HLS players) begins near the *back* of this buffer, so a deeper buffer = more lag. **Lower it to reduce lag** — default **4**; try **3**, then **2**, watching for stalls/stutters (a smaller buffer is less forgiving of a slow fetch). Range **2–10**. Note each segment is only cut at a source **keyframe**, so in `copy` mode a segment is as long as your camera's keyframe interval (a 2-second keyframe interval → 2-second segments → more lag). The single biggest latency win is setting your camera's **sub-stream I-frame interval to ~1 second** (= its frame rate) so segments are 1s. Leave this blank to use the default of 4. |
 
 ---
 
