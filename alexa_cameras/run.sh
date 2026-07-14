@@ -250,6 +250,13 @@ snap_loop() {
 
 start_workers() {
   read_config
+  # Clean out any stale HLS output before (re)starting workers. ffmpeg restarts its segment
+  # numbering from 0, and -hls_flags delete_segments only prunes segments still in the *current*
+  # playlist — so old high-numbered seg_*.ts from a previous run (e.g. after a config reload) would
+  # orphan and slowly eat /tmp until a future run happened to climb back over their numbers. Wiping
+  # here guarantees a clean slate each start and also removes dirs for cameras you've since deleted.
+  # (Workers are already stopped when this runs on reload; on first boot the dir is empty anyway.)
+  rm -rf "$HLS"/* 2>/dev/null
   local count=0 line name host path mode url audio_source on_demand
   for line in "${CAMLINES[@]}"; do
     [ -z "$line" ] && continue

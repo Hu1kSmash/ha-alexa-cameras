@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.1
+
+- **Fix: stale HLS segments no longer pile up in `/tmp`.** On a config-reload worker restart, the
+  new ffmpeg begins segment numbering from `0` again, and `delete_segments` only prunes segments in
+  the *current* playlist — so the previous run's high-numbered `seg_*.ts` orphaned and lingered
+  (a slow `/tmp` leak across restarts). Worker startup now wipes stale HLS output first, so every
+  restart begins with a clean slate (this also clears leftover directories for cameras you've deleted).
+
 ## 1.11.0
 
 - **Validate streams no longer wakes on-demand cameras.** "Validate all" (and the per-camera
