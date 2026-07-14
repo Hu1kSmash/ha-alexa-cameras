@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.1
+
+- **Fix: a per-camera Path is no longer accepted alongside a URL** (it was silently ignored, which
+  was confusing). The form now **greys out the Path field when a URL is set**, and any stray `path`
+  is dropped on save — including for YAML-mode edits.
+
 ## 1.14.0
 
 - **Click an `inject` / `inject_mix` audio pill on the Validate page to fire a quick test** — the

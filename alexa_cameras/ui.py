@@ -158,6 +158,11 @@ def save_config(data):
     err = validate_config(data)
     if err:
         return err
+    # A full `url` already includes its path, so a per-camera `path` is ignored alongside it —
+    # drop it to keep the stored config honest (covers YAML-mode edits too, not just the form).
+    for c in data.get("cameras") or []:
+        if isinstance(c, dict) and str(c.get("url", "")).strip() and "path" in c:
+            c.pop("path", None)
     try:
         tmp = CONFIG + ".tmp"
         with open(tmp, "w") as f:
@@ -1011,7 +1016,7 @@ function sanitizeName(el){ var s=el.value.toLowerCase().replace(/[^a-z0-9_]/g,''
 // (greyed + disabled) until they clear it; url wins if both somehow carry a value.
 function hostUrlExclusive(el){
   var tr = el.closest ? el.closest('tr') : null; if(!tr) return;
-  var h = tr.querySelector('[data-f="host"]'), u = tr.querySelector('[data-f="url"]');
+  var h = tr.querySelector('[data-f="host"]'), u = tr.querySelector('[data-f="url"]'), p = tr.querySelector('[data-f="path"]');
   if(!h || !u) return;
   var hv = h.value.trim()!=='', uv = u.value.trim()!=='';
   if(uv){ h.disabled = true; u.disabled = false; }
@@ -1021,6 +1026,12 @@ function hostUrlExclusive(el){
     x.style.opacity = x.disabled ? '0.4' : '';
     x.title = x.disabled ? 'A camera uses host OR url — clear the other field to edit this one.' : '';
   });
+  // Path applies only to a host-based camera; a full URL already includes its path, so lock it out.
+  if(p){
+    p.disabled = uv;
+    p.style.opacity = uv ? '0.4' : '';
+    p.title = uv ? 'A full URL already includes its path — clear the URL to set a per-camera Path.' : '';
+  }
 }
 function val(id){ return (document.getElementById(id).value||'').trim(); }
 function msg(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
@@ -1148,6 +1159,7 @@ function gatherForm(){
       var v=(el.value||'').trim();
       if(v){ c[f]=v; } else { delete c[f]; }
     });
+    if(c.url && c.path) delete c.path;  // a full URL includes its path — never save a stray path with it
     if(c.name){ if(!c.mode) c.mode='transcode'; cams.push(c); }
   });
   d.cameras = cams;
