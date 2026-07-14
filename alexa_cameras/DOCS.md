@@ -307,9 +307,9 @@ Alexa may show black"* — but on a bad `copy` the Source check red-errors first
 ### Live-view latency
 
 **Why the live view lags behind real-time — and how to make it snappy.** When a camera is live, the
-**Output** check adds four small rows beneath **Source** / **Output** — what the add-on **Detected**
-(segment length, and the camera's I-frame interval that sets it), your current **Buffer** depth, the
-resulting **Latency** with the math shown, and (when there's headroom) a **Tune** step you can take:
+**Output** check also breaks down its latency: what the add-on **Detected** (the segment length, and
+the camera's I-frame interval that sets it), your current **Buffer** depth, the resulting **Latency**
+with the math shown, and — when there's headroom — a **Tune** step to cut it:
 
 > **Detected** — Source keyframe every **2s** (camera I-frame interval 30 frames ÷ 15 fps = 2s)
 > **Buffer** — **4 segments** in the playlist — set under Configuration → Streaming (HLS buffer segments)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.6
+
+- Docs: reword the Live-view latency intro to describe what the Output check reports rather than the
+  UI mechanics ("adds four small rows").
+
 ## 1.16.5
 
 - Docs: expand **HLS** to **HLS (HTTP Live Streaming)** on first use in the add-on docs, README, and
