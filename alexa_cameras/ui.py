@@ -968,7 +968,6 @@ INDEX_HTML = r"""<!doctype html>
       </div></div>
     </div>
     <div class="panel"><h2>Cameras</h2><div id="camsummary">Loading&hellip;</div>
-      <div style="margin-top:12px"><button class="primary" onclick="showTab('validate'); validateAll()">Validate all streams &rarr;</button></div>
     </div>
     <div style="text-align:right; margin-top:8px"><span class="dbg-dot" title="Advanced diagnostics" onclick="showTab('debug')">&#129514;</span></div>
   </section>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.1
+
+- Removed the **Validate all streams** button from the Overview tab (the Validate tab has its own
+  **Validate all** button; the Overview now just shows the per-camera config at a glance).
+
 ## 1.16.0
 
 - **Overview now shows the full per-camera config pills** — On-demand / Mode / Source / Path / Audio,
