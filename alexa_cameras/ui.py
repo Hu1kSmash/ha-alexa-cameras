@@ -830,6 +830,12 @@ INDEX_HTML = r"""<!doctype html>
   .cfg .c.off { opacity:.4; border-style:dashed; cursor:default; }
   .cfg .c.aud { cursor:pointer; border-color:#7c5cff; color:#7c5cff; }
   .cfg .c.aud:hover { background:rgba(124,92,255,.14); }
+  .cfg .c.aud.ro { cursor:help; }
+  .cfg .c.aud.ro:hover { background:transparent; }
+  /* Overview camera rows reuse the Validate config pills (read-only). 15px right pad matches .vhead so pills sit under their headers. */
+  .ovcam { padding:9px 15px; border-bottom:1px solid var(--line); }
+  .ovcam:last-child { border-bottom:none; }
+  .ovcam .src2 { margin:5px 0 0; }
   .vhead { display:flex; align-items:center; gap:10px; padding:2px 15px 8px; }  /* right pad matches .card (14px + 1px border) so header columns align over the pills */
   .vhead .cfg .c { border:none; opacity:.55; font-weight:600; padding:0 6px; cursor:default; }
   button.primary { font:inherit; font-weight:600; padding:8px 15px; border-radius:9px; cursor:pointer; border:1px solid #3b82f6; background:#3b82f6; color:#fff; }
@@ -1130,8 +1136,9 @@ async function loadCameras(){
     '<div class="k">HLS buffer</div><div>'+hls+' segment'+(hls==1?'':'s')+' <span style="opacity:.55">&mdash; live-view buffer depth</span></div>';
   var cs = document.getElementById('camsummary');
   if(!CAMS || !CAMS.length){ cs.innerHTML = '<p>No cameras yet &mdash; open <b>Configuration</b> to add some.</p>'; }
-  else { cs.innerHTML = '<table class="cams"><thead><tr><th>Name</th><th>Mode</th><th>Source</th></tr></thead><tbody>'+
-    CAMS.map(function(c){ return '<tr><td><b>'+esc(c.name)+'</b></td><td><span class="mode">'+esc(c.mode)+'</span></td><td class="src">'+esc(c.source)+'</td></tr>'; }).join('')+'</tbody></table>'; }
+  else { cs.innerHTML = '<div class="vhead"><span style="flex:1"></span>'+cfgHead()+'</div>'+
+    CAMS.map(function(c){ return '<div class="ovcam"><div class="row"><span class="name">'+esc(c.name)+'</span>'+
+      '<span style="flex:1"></span>'+cfgPills(c,false)+'</div><div class="src2">'+esc(c.source)+'</div></div>'; }).join(''); }
   renderValidate(); renderPublic();
 }
 
@@ -1278,31 +1285,43 @@ async function loadLogs(){
   } catch(e){}
 }
 
-/* ---------- Validate ---------- */
+/* ---------- Config pills (shared by Overview + Validate) ---------- */
 function cfgc(v,cls,title){ return '<span class="c'+(cls?' '+cls:'')+'"'+(title?' title="'+esc(title)+'"':'')+'>'+esc(v)+'</span>'; }
+function cfgHead(){ return '<div class="cfg">'+
+  '<span class="c">On-demand</span><span class="c">Mode</span><span class="c">Source</span>'+
+  '<span class="c">Path</span><span class="c">Audio</span></div>'; }
+// interactive=true (Validate) makes the inject/inject_mix pill clickable to fire a test message;
+// on the Overview it's purely informational.
+function cfgPills(c, interactive){
+  var audio;
+  if(c.audio==='inject'||c.audio==='inject_mix'){
+    audio = interactive
+      ? '<span class="c aud" title="Click to inject a test message into this camera\'s stream — then view the camera on an Echo Show to hear it" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio)+'</span>'
+      : cfgc(c.audio, 'aud ro', 'audio injection: '+esc(c.audio)+' — use the Validate tab to fire a test');
+  } else if(c.audio){
+    audio = cfgc(c.audio, '', 'audio: '+esc(c.audio));
+  } else {
+    audio = cfgc('–','off','No audio injection on this camera');
+  }
+  return '<div class="cfg">'+
+    (c.on_demand ? cfgc('yes','','Connects only while watched; skipped by Validate all so it isn\'t woken') : cfgc('–','off','Always-on camera'))+
+    cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
+    cfgc(c.source_label||'—', c.source_label==='Restream'?'rst':'', c.source_why||'')+
+    cfgc(c.path_label||'—', '', c.path_why||'')+
+    audio+
+  '</div>';
+}
 function renderValidate(){
   var list = document.getElementById('list');
   if(!CAMS || !CAMS.length){ list.innerHTML='<p>No cameras configured.</p>'; return; }
   // Header row: labels the right-justified config columns so a user can scan down each column
   // and instantly spot a camera the add-on read differently than expected.
-  var head = '<div class="vhead"><span style="flex:1"></span><div class="cfg">'+
-    '<span class="c">On-demand</span><span class="c">Mode</span><span class="c">Source</span>'+
-    '<span class="c">Path</span><span class="c">Audio</span></div></div>';
+  var head = '<div class="vhead"><span style="flex:1"></span>'+cfgHead()+'</div>';
   var cards = CAMS.map(function(c){
     var btn = c.on_demand
       ? '<button class="vbtn" onclick="validateCam(\''+esc(c.name)+'\', true)" title="Runs the live check for this on-demand camera, which briefly wakes the source (e.g. Frigate birdseye)">Check stream</button>'
       : '<button class="vbtn" onclick="validateCam(\''+esc(c.name)+'\')">Validate</button>';
-    var cfg = '<div class="cfg">'+
-      (c.on_demand ? cfgc('yes','','Connects only while watched; skipped by Validate all so it isn\'t woken') : cfgc('–','off','Always-on camera'))+
-      cfgc(c.mode||'?', '', c.mode==='copy'?'copy: remux only (near-zero CPU) — source is already H.264 Baseline/Main':'transcode: re-encode to H.264 Baseline (uses CPU)')+
-      cfgc(c.source_label||'—', c.source_label==='Restream'?'rst':'', c.source_why||'')+
-      cfgc(c.path_label||'—', '', c.path_why||'')+
-      (c.audio ?
-        ((c.audio==='inject'||c.audio==='inject_mix')
-          ? '<span class="c aud" title="Click to inject a test message into this camera\'s stream — then view the camera on an Echo Show to hear it" onclick="sayTest(\''+esc(c.name)+'\',this)">'+esc(c.audio)+'</span>'
-          : cfgc(c.audio, '', 'audio: '+esc(c.audio)))
-        : cfgc('–','off','No audio injection on this camera'))+
-    '</div>';
+    var cfg = cfgPills(c, true);
     return '<div class="card" data-cam="'+esc(c.name)+'"'+(c.on_demand?' data-od="1"':'')+'>'+
       '<div class="row">'+btn+'<span class="name">'+esc(c.name)+'</span>'+
         '<span style="flex:1"></span>'+cfg+'</div>'+

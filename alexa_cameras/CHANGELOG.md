@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.0
+
+- **Overview now shows the full per-camera config pills** — On-demand / Mode / Source / Path / Audio,
+  the same read-out as the Validate tab — so you can see how the add-on interpreted every camera at a
+  glance, without kicking off the live stream checks. (Validate keeps the clickable inject/inject_mix
+  test pill; on Overview those pills are read-only.)
+
 ## 1.15.11
 
 - Overview → Status now also shows the configured **TTS engine** (used for audio-injection text) and

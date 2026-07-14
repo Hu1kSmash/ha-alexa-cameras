@@ -35,7 +35,9 @@ Cameras** item in the Home Assistant sidebar. Its tabs:
 
 - **Overview** — status (version, camera count, a clickable **Served at** `http://<HA-IP>:8888` link
   to browse the raw served files, the configured **TTS engine** used for audio-injection text, and the
-  **HLS buffer** depth) and a summary of your cameras.
+  **HLS buffer** depth) plus a per-camera summary showing **how the add-on read each camera** — the
+  same **On-demand / Mode / Source / Path / Audio** pills as the Validate tab, so you can eyeball your
+  whole setup at a glance without running the live checks.
 - **[Configuration](#configuration-overview)** — the form / YAML editor (covered next).
 - **[Validate streams](#validate-streams)** — per-camera **Source** + **Output** codec checks.
 - **[Public URL check](#public-url-check)** — compares the **Internal** LAN stream (`:8888`) with
