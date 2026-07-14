@@ -51,6 +51,7 @@ banner() {
 ART
   printf '        C A M E R A S  (HLS)  —  RTSP → Amazon Echo Show\n'
   printf '        v%s   started %s\n' "${VERSION:-?}" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  printf '        \302\251 2026 Tom Hirt  \302\267  github.com/Hu1kSmash/ha-alexa-cameras\n'
   printf '████████████████████████████████████████████████████████████████\n\n'
 }
 
