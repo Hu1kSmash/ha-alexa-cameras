@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.4
+
+- Logs: standardized every line to the same **`[HH:MM:SS]`** prefix. The `:8888` access log now reads
+  `[HH:MM:SS] <client-ip> "GET /… " 200` (was `<ip> - - [DD/Mon/YYYY HH:MM:SS] …`, a different format
+  with the IP first), and the injector's startup lines (`feeding` / `control on`) are timestamped too.
+
 ## 1.18.3
 
 - Camera editor: the **Announcement voice** (and the other "inherit the global default") dropdowns now

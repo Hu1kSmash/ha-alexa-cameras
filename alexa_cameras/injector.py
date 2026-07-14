@@ -307,8 +307,8 @@ def main():
                 fdr = Feeder(name)
                 feeders[name] = fdr
                 fdr.start()
-                print("[injector] feeding '%s' at %s" % (name, fdr.path), flush=True)
-    print("[injector] control on :%d  cams=%s" % (PORT, list(feeders)), flush=True)
+                print("[%s] [injector] feeding '%s' at %s" % (time.strftime("%H:%M:%S"), name, fdr.path), flush=True)
+    print("[%s] [injector] control on :%d  cams=%s" % (time.strftime("%H:%M:%S"), PORT, list(feeders)), flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 

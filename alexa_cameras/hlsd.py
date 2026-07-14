@@ -26,6 +26,7 @@ never connected to at all — no polling, no churn, nothing to wedge the upstrea
 actually asks for it (Alexa, the auto-show automation, a browser), the touch wakes the worker.
 """
 import os
+import sys
 import time
 
 import yaml
@@ -59,6 +60,11 @@ def on_demand_cams():
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=HLS, **k)
+
+    def log_message(self, fmt, *args):
+        # Match the rest of the add-on's log format: "[HH:MM:SS] <client-ip> <message>"
+        # (default is "<ip> - - [DD/Mon/YYYY HH:MM:SS] <message>", which reads inconsistently).
+        sys.stderr.write("[%s] %s %s\n" % (time.strftime("%H:%M:%S"), self.address_string(), fmt % args))
 
     def _signal_demand(self):
         # path is like /birdseye/stream.m3u8 or /birdseye/seg_00001.ts or /birdseye/snapshot.jpg
