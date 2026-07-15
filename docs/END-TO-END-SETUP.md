@@ -669,3 +669,7 @@ ffmpeg -v error -i http://<ha-host>:8888/<name>/stream.m3u8 -t 5 -f null -
 - For a single "follow the action" camera, point the add-on's per-camera `url` at a
   Frigate **birdseye** restream (`rtsp://<frigate>:8554/birdseye`, `mode: transcode`
   since birdseye is H.264 High) — see the [Documentation](../alexa_cameras/DOCS.md).
+
+---
+
+<sub>© 2026 Tom Hirt · Licensed under Apache-2.0 (see [LICENSE](../LICENSE) and [NOTICE](../NOTICE)) · [github.com/Hu1kSmash/ha-alexa-cameras](https://github.com/Hu1kSmash/ha-alexa-cameras)</sub>

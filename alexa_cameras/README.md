@@ -51,4 +51,4 @@ of port 8888 and a self-hosted Alexa Smart Home skill — that full build is the
 
 ## License
 
-Apache License 2.0 — see [LICENSE](../LICENSE) and [NOTICE](../NOTICE).
+Apache License 2.0 — see [LICENSE](../LICENSE) and [NOTICE](../NOTICE). Copyright 2026 Tom Hirt.

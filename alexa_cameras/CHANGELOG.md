@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.14
+
+- Docs: copyright now on every doc — added the license footer to the End-to-End Setup guide (it had
+  none) and the copyright line to the add-on README (the repo README already had it).
+
 ## 1.19.13
 
 - Docs: added a copyright / Apache-2.0 license footer at the end of DOCS.md (matches the startup
