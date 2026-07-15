@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.12
+
+- Docs: added a closing *Hit a snag? Found a bug?* section — points to GitHub Issues, encourages
+  pasting the (safe-to-share, masked) Logs, and sends readers to the End-to-End Setup guide for the
+  bigger picture.
+
 ## 1.19.11
 
 - Docs: added a lead-in for the audio-injection YAML example (it lost its context when the *Quick test*

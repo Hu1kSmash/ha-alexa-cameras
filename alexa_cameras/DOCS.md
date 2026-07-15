@@ -1165,3 +1165,21 @@ devices = await (await fetch('/nexus/v1/graphql', { method: 'POST', headers: {"C
 **3. Refresh the page**, then say **"Alexa, discover devices."**
 
 If the fetch returns `401`, issue #9 documents a fallback that adds a CSRF token header.
+
+---
+
+## Hit a snag? Found a bug?
+
+Please open an issue at **[github.com/Hu1kSmash/ha-alexa-cameras/issues](https://github.com/Hu1kSmash/ha-alexa-cameras/issues)**
+— and **paste your Logs**. The add-on prints a masked **configuration summary** on every start and save
+(passwords and tokens are redacted, so the whole block is safe to share), and camera failures are
+logged with the reason; that context is usually all it takes to spot what's wrong. The more of the log
+you include, the faster it can be sorted out.
+
+And if you've made it this far, you've done the hard part on the add-on itself. The remaining pieces —
+HTTPS in front of port 8888, the self-hosted Alexa skill, the AWS Lambda camera override, and the
+Cloudflare Tunnel + WAF that ties it all together — are what actually carry these streams to your Echo
+Show. For the whole picture end to end, read the
+**[End-to-End Setup guide](https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/docs/END-TO-END-SETUP.md)**.
+
+Thanks for running it. 📷
