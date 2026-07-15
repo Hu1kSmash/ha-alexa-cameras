@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.11
+
+- Docs: added a lead-in for the audio-injection YAML example (it lost its context when the *Quick test*
+  section was inserted above it) — now under a *What it looks like in config* heading.
+
 ## 1.19.10
 
 - Docs: documented that a camera's **`inject` / `inject_mix` audio pill is clickable** anywhere it

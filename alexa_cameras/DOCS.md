@@ -774,6 +774,12 @@ with **no token or `rest_command` needed**. Two ways to confirm it landed:
   [18:19:38] [injector] say cam='porch' text "Audio injection test on the porch camera." (3936ms clip)
   ```
 
+### What it looks like in config
+
+You set all of this from the Web UI (the per-camera **Audio** dropdown and the **Audio injection**
+panel), but here's the equivalent YAML — two injection-enabled cameras plus the two optional top-level
+settings that back the feature:
+
 ```yaml
 cameras:
   - name: birdseye
