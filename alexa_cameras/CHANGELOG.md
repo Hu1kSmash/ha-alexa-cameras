@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.13
+
+- Docs: added a copyright / Apache-2.0 license footer at the end of DOCS.md (matches the startup
+  banner's credit line).
+
 ## 1.19.12
 
 - Docs: added a closing *Hit a snag? Found a bug?* section — points to GitHub Issues, encourages

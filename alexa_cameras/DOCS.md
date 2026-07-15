@@ -1183,3 +1183,7 @@ Show. For the whole picture end to end, read the
 **[End-to-End Setup guide](https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/docs/END-TO-END-SETUP.md)**.
 
 Thanks for running it. 📷
+
+---
+
+<sub>© 2026 Tom Hirt · Licensed under Apache-2.0 (see [LICENSE](https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/LICENSE) and [NOTICE](https://github.com/Hu1kSmash/ha-alexa-cameras/blob/main/NOTICE)) · [github.com/Hu1kSmash/ha-alexa-cameras](https://github.com/Hu1kSmash/ha-alexa-cameras)</sub>
