@@ -49,6 +49,6 @@ of port 8888 and a self-hosted Alexa Smart Home skill — that full build is the
 - **[End-to-End Setup](../docs/END-TO-END-SETUP.md)** — the complete self-hosted path:
   Cloudflare Tunnel + WAF, the Alexa skill, and the AWS Lambda camera override.
 
-## License
+---
 
-Apache License 2.0 — see [LICENSE](../LICENSE) and [NOTICE](../NOTICE). Copyright 2026 Tom Hirt.
+<sub>© 2026 Tom Hirt · Licensed under Apache-2.0 (see [LICENSE](../LICENSE) and [NOTICE](../NOTICE)) · [github.com/Hu1kSmash/ha-alexa-cameras](https://github.com/Hu1kSmash/ha-alexa-cameras)</sub>

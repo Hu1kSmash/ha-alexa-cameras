@@ -221,12 +221,8 @@ Questions, bug reports, and feature requests → please
 [open an issue on GitHub](https://github.com/Hu1kSmash/ha-alexa-cameras/issues). That's the
 best way to reach the maintainer and keep the answer searchable for others.
 
-## License
+---
 
-**Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
-Copyright 2026 Tom Hirt.
+<sub>© 2026 Tom Hirt · Licensed under Apache-2.0 (see [LICENSE](LICENSE) and [NOTICE](NOTICE)) · [github.com/Hu1kSmash/ha-alexa-cameras](https://github.com/Hu1kSmash/ha-alexa-cameras)</sub>
 
-**Third-party:** the example AWS Lambda in the
-[end-to-end setup guide](docs/END-TO-END-SETUP.md) is derived from the community Home
-Assistant Alexa Smart Home Lambda by Jason Hu and Matthew Hilton, also under the
-**Apache License 2.0** (see the attribution header in that code block).
+<sub>**Third-party:** the example AWS Lambda in the [end-to-end setup guide](docs/END-TO-END-SETUP.md) is derived from the community Home Assistant Alexa Smart Home Lambda by Jason Hu and Matthew Hilton, also under Apache-2.0 (see the attribution header in that code block).</sub>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.15
+
+- Docs: standardized the copyright/license on the same `<sub>` footer across all four docs — converted
+  both READMEs' `## License` sections to it (the repo README keeps its third-party AWS-Lambda
+  attribution as a second footer line).
+
 ## 1.19.14
 
 - Docs: copyright now on every doc — added the license footer to the End-to-End Setup guide (it had
