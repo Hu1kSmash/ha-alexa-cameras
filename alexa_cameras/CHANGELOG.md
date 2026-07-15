@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.19.16
+
+- **Docs correction — `on_demand` must be OFF for any camera an automation shows.** The docs
+  recommended `on_demand: true` for Frigate birdseye *and* documented the auto-show-on-detection
+  recipe; those two cannot both work. On-demand's first request is what *starts* the stream, so it
+  necessarily gets a **404** — and **Alexa never retries**, it gives up. The stream then warms and
+  plays to nobody. It isn't a brief race to wait out: a cold birdseye takes **~60 s** to a first
+  segment (measured; the docs previously claimed ~30 s and that "a retry works" — an automation gets
+  no retry). Corrected the On-demand field reference, the Validate birdseye note (now a
+  who-opens-it decision table), the Logs on-demand trace, the Troubleshooting rows (added a row for
+  the lone-404 signature), and the auto-show recipe, which now requires `on_demand: false`.
+
 ## 1.19.15
 
 - Docs: standardized the copyright/license on the same `<sub>` footer across all four docs — converted
