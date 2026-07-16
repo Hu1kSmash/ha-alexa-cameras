@@ -1237,7 +1237,8 @@ INDEX_HTML = r"""<!doctype html>
         </select></label>
       <label class="fld" id="m-tts-fld"><span>Announcement voice <span style="opacity:.55">(blank = use the global default)</span></span>
         <select id="m-tts" onchange="dimSel(this)"></select></label>
-      <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (e.g. Frigate birdseye)</span></label>
+      <label class="fld chk"><input type="checkbox" id="m-ondemand"><span>On&#8209;demand &mdash; connect only while watched (saves CPU on a rarely-watched source)</span></label>
+      <div class="fld-help" style="margin:-4px 0 8px 26px;opacity:.6;font-size:.82rem">&#9888; Don&rsquo;t enable this for a camera an <b>automation</b> shows (e.g. auto-show birdseye on a detection): the first request 404s while it cold-starts and Alexa won&rsquo;t retry, so the view fails. Leave it off (always-on) for those.</div>
       <div class="adv">
         <h4>Advanced</h4>
         <label class="fld"><span>HLS buffer segments <span style="opacity:.55">(2&#8211;10; lower = less lag)</span></span><input id="m-buf" type="number" min="2" max="10" placeholder="(use global default)"></label>

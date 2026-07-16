@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.17
+
+- Camera editor: the **On-demand** checkbox no longer holds up Frigate birdseye as the example of
+  *when* to enable it — birdseye is typically shown by an automation, which is the one case on-demand
+  can't serve (its first request 404s during the ~60 s cold start and Alexa doesn't retry). The
+  helper text now describes on-demand as a CPU saver for a rarely-watched source and **warns not to
+  enable it for a camera an automation shows**. (Behaviour unchanged; matches the v1.19.16 docs.)
+
 ## 1.19.16
 
 - **Docs correction — `on_demand` must be OFF for any camera an automation shows.** The docs
